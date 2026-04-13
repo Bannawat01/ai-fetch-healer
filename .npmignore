@@ -1,0 +1,11 @@
+.env
+.claude/
+.vscode/
+.github/
+tests/
+src/
+biome.json
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+images/
