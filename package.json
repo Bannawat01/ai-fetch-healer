@@ -2,6 +2,20 @@
 	"name": "ai-fetch-healer",
 	"version": "1.0.0",
 	"description": "Runtime API Auto-Healing Wrapper",
+	"keywords": [
+		"fetch",
+		"ai",
+		"gemini",
+		"openrouter",
+		"auto-healing",
+		"api"
+	],
+	"author": "Bannawat Rattanarak",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Bannawat01/ai-fetch-healer.git"
+	},
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
 	"types": "./dist/index.d.ts",
