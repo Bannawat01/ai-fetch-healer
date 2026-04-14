@@ -23,7 +23,17 @@ export abstract class BaseLLMProvider implements ILLMProvider {
 		const contentType = response.headers.get("content-type") || "";
 
 		if (contentType.toLowerCase().includes("application/json")) {
-			return await response.json();
+			const rawBody = await response.text();
+
+			if (!rawBody.trim()) {
+				return "";
+			}
+
+			try {
+				return JSON.parse(rawBody);
+			} catch {
+				return rawBody;
+			}
 		}
 
 		return await response.text();
