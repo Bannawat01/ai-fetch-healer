@@ -19,5 +19,15 @@ export abstract class BaseLLMProvider implements ILLMProvider {
 		return { controller, timeoutId };
 	}
 
+	protected async readResponseBodySafe(response: Response): Promise<unknown> {
+		const contentType = response.headers.get("content-type") || "";
+
+		if (contentType.toLowerCase().includes("application/json")) {
+			return await response.json();
+		}
+
+		return await response.text();
+	}
+
 	abstract heal(schema: unknown, errorDetails: string): Promise<LLMResponse>;
 }

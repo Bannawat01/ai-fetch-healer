@@ -25,6 +25,7 @@ export class GeminiProvider extends BaseLLMProvider {
       {
         "action": "MAP_FIELDS" | "CHANGE_TYPE" | "ADD_REQUIRED",
         "mapping": { "old_key_name": "new_key_name" },
+				"typeChanges": { "field_name": "string" | "number" | "boolean" | "null" },
         "suggestion": "Brief explanation of what was fixed"
       }
     `;
@@ -45,8 +46,20 @@ export class GeminiProvider extends BaseLLMProvider {
 				throw new Error(`Gemini API Error: ${response.statusText}`);
 			}
 
-			const data = await response.json();
-			const aiResponseText = data.candidates[0].content.parts[0].text;
+			const body = await this.readResponseBodySafe(response);
+			if (!body || typeof body !== "object") {
+				throw new Error("Gemini returned non-JSON response body");
+			}
+
+			const data = body as {
+				candidates?: Array<{
+					content?: { parts?: Array<{ text?: string }> };
+				}>;
+			};
+			const aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+			if (!aiResponseText || typeof aiResponseText !== "string") {
+				throw new Error("Gemini response is missing JSON content");
+			}
 
 			const rule: HealingRule = JSON.parse(aiResponseText);
 

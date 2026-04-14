@@ -1,5 +1,11 @@
 import { Masker, type PayloadMasker } from "../security/masker";
-import type { HealingRule, ILLMProvider, JsonPayload } from "../types";
+import type {
+	HealingRule,
+	ILLMProvider,
+	JsonPayload,
+	JsonScalarType,
+	JsonValue,
+} from "../types";
 import { HeuristicCache } from "./cache";
 
 export interface HealerConfig {
@@ -20,6 +26,16 @@ function isStringMap(value: unknown): value is Record<string, string> {
 	return Object.values(value).every((v) => typeof v === "string");
 }
 
+function isTypeChangeMap(value: unknown): value is Record<string, JsonScalarType> {
+	if (!value || typeof value !== "object") {
+		return false;
+	}
+
+	return Object.values(value).every((v) =>
+		["string", "number", "boolean", "null"].includes(String(v)),
+	);
+}
+
 function isHealingRule(value: unknown): value is HealingRule {
 	if (!value || typeof value !== "object") {
 		return false;
@@ -29,8 +45,57 @@ function isHealingRule(value: unknown): value is HealingRule {
 	const validAction = typeof candidate.action === "string";
 	const validMapping =
 		candidate.mapping === undefined || isStringMap(candidate.mapping);
+	const validTypeChanges =
+		candidate.typeChanges === undefined || isTypeChangeMap(candidate.typeChanges);
 
-	return validAction && validMapping;
+	return validAction && validMapping && validTypeChanges;
+}
+
+function coerceJsonValue(value: JsonValue, targetType: JsonScalarType): JsonValue {
+	if (targetType === "string") {
+		return String(value);
+	}
+
+	if (targetType === "number") {
+		if (typeof value === "number") {
+			return value;
+		}
+
+		if (typeof value === "boolean") {
+			return value ? 1 : 0;
+		}
+
+		if (typeof value === "string") {
+			const parsed = Number(value.trim());
+			return Number.isFinite(parsed) ? parsed : value;
+		}
+
+		return value;
+	}
+
+	if (targetType === "boolean") {
+		if (typeof value === "boolean") {
+			return value;
+		}
+
+		if (typeof value === "number") {
+			return value !== 0;
+		}
+
+		if (typeof value === "string") {
+			const normalized = value.trim().toLowerCase();
+			if (["true", "1", "yes", "y"].includes(normalized)) {
+				return true;
+			}
+			if (["false", "0", "no", "n", ""].includes(normalized)) {
+				return false;
+			}
+		}
+
+		return value;
+	}
+
+	return null;
 }
 
 function ensureReadableResponse(response: Response): Response {
@@ -129,23 +194,40 @@ export function createHealedFetch(
 				);
 			}
 
-			if (!healingRule.mapping) {
+			if (!healingRule.mapping && !healingRule.typeChanges) {
 				return ensureReadableResponse(response);
 			}
 
-			if (healingRule.action !== "MAP_FIELDS") {
+			if (
+				healingRule.action !== "MAP_FIELDS" &&
+				healingRule.action !== "CHANGE_TYPE"
+			) {
 				console.warn(
 					`[ai-fetch-healer] Unsupported action "${healingRule.action}". Applying mapping fallback.`,
 				);
 			}
 
 			const finalPayload: JsonPayload = { ...originalPayload };
+			const mapping = healingRule.mapping ?? {};
 
-			for (const [oldKey, newKey] of Object.entries(healingRule.mapping)) {
-				if (finalPayload[oldKey] !== undefined) {
+			for (const [oldKey, newKey] of Object.entries(mapping)) {
+				if (finalPayload[oldKey] === undefined) {
+					continue;
+				}
+
+				if (oldKey !== newKey) {
 					finalPayload[newKey] = finalPayload[oldKey];
 					delete finalPayload[oldKey];
 				}
+			}
+
+			const typeChanges = healingRule.typeChanges ?? {};
+			for (const [key, targetType] of Object.entries(typeChanges)) {
+				if (finalPayload[key] === undefined) {
+					continue;
+				}
+
+				finalPayload[key] = coerceJsonValue(finalPayload[key], targetType);
 			}
 
 			const healedInit: RequestInit = {

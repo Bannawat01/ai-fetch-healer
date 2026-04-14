@@ -81,6 +81,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
       {
         "action": "MAP_FIELDS" | "CHANGE_TYPE",
         "mapping": { "old_key": "new_key" },
+				"typeChanges": { "field_name": "string" | "number" | "boolean" | "null" },
         "suggestion": "string"
       }
     `;
@@ -108,8 +109,20 @@ export class OpenRouterProvider extends BaseLLMProvider {
 				throw new Error(`OpenRouter Error: ${err}`);
 			}
 
-			const data = await response.json();
-			const rule: HealingRule = JSON.parse(data.choices[0].message.content);
+			const body = await this.readResponseBodySafe(response);
+			if (!body || typeof body !== "object") {
+				throw new Error("OpenRouter returned non-JSON response body");
+			}
+
+			const data = body as {
+				choices?: Array<{ message?: { content?: string } }>;
+			};
+			const aiContent = data.choices?.[0]?.message?.content;
+			if (!aiContent || typeof aiContent !== "string") {
+				throw new Error("OpenRouter response is missing JSON content");
+			}
+
+			const rule: HealingRule = JSON.parse(aiContent);
 
 			const healedPayload: JsonPayload = {};
 			const mapping = rule.mapping ?? {};
