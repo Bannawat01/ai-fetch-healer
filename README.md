@@ -31,9 +31,6 @@ The result is better uptime, fewer emergency hotfixes, and a smoother on-call ex
 
 - `GeminiProvider`
 - `OpenRouterProvider`
-
-## Planned Support / Roadmap
-
 - `GroqProvider`
 - `OllamaProvider`
 
