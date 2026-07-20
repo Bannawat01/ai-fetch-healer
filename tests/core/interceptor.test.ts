@@ -478,4 +478,91 @@ describe("createHealedFetch", () => {
 
 		expect(onHealFail).toHaveBeenCalledTimes(1);
 	});
+
+	it("applies ADD_REQUIRED by injecting the missing field, even with no mapping/typeChanges", async () => {
+		const provider: ILLMProvider = {
+			name: "MockProvider",
+			heal: vi.fn().mockResolvedValue({
+				healedPayload: {},
+				rule: {
+					action: "ADD_REQUIRED",
+					addFields: { currency: "USD" },
+					suggestion: "currency is required by the API but was never sent",
+				},
+			}),
+		};
+
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(
+			new Response('{"error":"currency is required"}', {
+				status: 400,
+				statusText: "Bad Request",
+				headers: { "content-type": "application/json" },
+			}),
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response('{"ok":true}', {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+		});
+
+		await healedFetch("https://api.example.com/orders", {
+			method: "POST",
+			body: JSON.stringify({ amount: 100 }),
+		});
+
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+
+		const secondInit = fetchMock.mock.calls[1][1] as RequestInit;
+		const healedBody = JSON.parse(String(secondInit.body));
+
+		expect(healedBody).toEqual({ amount: 100, currency: "USD" });
+	});
+
+	it("never overwrites a key that's already present via ADD_REQUIRED", async () => {
+		const provider: ILLMProvider = {
+			name: "MockProvider",
+			heal: vi.fn().mockResolvedValue({
+				healedPayload: {},
+				rule: {
+					action: "ADD_REQUIRED",
+					addFields: { amount: 0 },
+				},
+			}),
+		};
+
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(
+			new Response("bad request", {
+				status: 400,
+				statusText: "Bad Request",
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response('{"ok":true}', {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+		});
+
+		await healedFetch("https://api.example.com/orders", {
+			method: "POST",
+			body: JSON.stringify({ amount: 100 }),
+		});
+
+		const secondInit = fetchMock.mock.calls[1][1] as RequestInit;
+		const healedBody = JSON.parse(String(secondInit.body));
+
+		expect(healedBody.amount).toBe(100);
+	});
 });

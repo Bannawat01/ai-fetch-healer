@@ -8,11 +8,13 @@ export type JsonScalarType = "string" | "number" | "boolean" | "null";
 
 /** A schema-fix instruction returned by an LLM provider and applied by `createHealedFetch`. */
 export interface HealingRule {
-	action: "MAP_FIELDS" | "CHANGE_TYPE";
+	action: "MAP_FIELDS" | "CHANGE_TYPE" | "ADD_REQUIRED";
 	/** Old key -> new key renames, applied before typeChanges. */
 	mapping?: Record<string, string>;
 	/** Per-key scalar coercions, applied after mapping. */
 	typeChanges?: Record<string, JsonScalarType>;
+	/** Missing required key -> default value to inject, applied last. Never overwrites a key already present. */
+	addFields?: Record<string, JsonValue>;
 	/** Optional human-readable explanation, surfaced only for logging/debugging. */
 	suggestion?: string;
 }

@@ -101,6 +101,10 @@ function isTypeChangeMap(
 	);
 }
 
+function isPlainRecord(value: unknown): value is Record<string, JsonValue> {
+	return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
 function isHealingRule(value: unknown): value is HealingRule {
 	if (!value || typeof value !== "object") {
 		return false;
@@ -113,8 +117,10 @@ function isHealingRule(value: unknown): value is HealingRule {
 	const validTypeChanges =
 		candidate.typeChanges === undefined ||
 		isTypeChangeMap(candidate.typeChanges);
+	const validAddFields =
+		candidate.addFields === undefined || isPlainRecord(candidate.addFields);
 
-	return validAction && validMapping && validTypeChanges;
+	return validAction && validMapping && validTypeChanges && validAddFields;
 }
 
 function coerceJsonValue(
@@ -313,13 +319,18 @@ export function createHealedFetch(
 				onHeal?.({ rule: healingRule, source: "cache" });
 			}
 
-			if (!healingRule.mapping && !healingRule.typeChanges) {
+			if (
+				!healingRule.mapping &&
+				!healingRule.typeChanges &&
+				!healingRule.addFields
+			) {
 				return ensureReadableResponse(response);
 			}
 
 			if (
 				healingRule.action !== "MAP_FIELDS" &&
-				healingRule.action !== "CHANGE_TYPE"
+				healingRule.action !== "CHANGE_TYPE" &&
+				healingRule.action !== "ADD_REQUIRED"
 			) {
 				logger.warn(
 					`[ai-fetch-healer] Unsupported action "${healingRule.action}". Applying mapping fallback.`,
@@ -347,6 +358,13 @@ export function createHealedFetch(
 				}
 
 				finalPayload[key] = coerceJsonValue(finalPayload[key], targetType);
+			}
+
+			const addFields = healingRule.addFields ?? {};
+			for (const [key, value] of Object.entries(addFields)) {
+				if (finalPayload[key] === undefined) {
+					finalPayload[key] = value;
+				}
 			}
 
 			const healedInit: RequestInit = {

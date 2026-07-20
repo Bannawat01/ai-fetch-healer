@@ -12,11 +12,17 @@ Your task is to map the incorrect payload schema to the required format based on
 Original Schema: ${JSON.stringify(schema)}
 Error Details: ${errorDetails}
 
-Respond strictly in JSON format matching this structure:
+Pick exactly one action based on what the error actually says:
+- "MAP_FIELDS": a field is misnamed (the API expects a different key for data already present in the schema).
+- "CHANGE_TYPE": a field has the wrong scalar type (e.g. string sent where a number is expected).
+- "ADD_REQUIRED": the error says a field is missing/required and it does NOT correspond to any key already in the Original Schema (nothing to rename).
+
+Respond strictly in JSON format matching this structure. Only include the object matching your chosen action; omit the others.
 {
   "action": "MAP_FIELDS" | "CHANGE_TYPE" | "ADD_REQUIRED",
   "mapping": { "old_key_name": "new_key_name" },
   "typeChanges": { "field_name": "string" | "number" | "boolean" | "null" },
+  "addFields": { "missing_field_name": "<a reasonable default value of the correct type>" },
   "suggestion": "Brief explanation of what was fixed"
 }
 `;
@@ -30,9 +36,14 @@ Respond strictly in JSON format matching this structure:
 export function buildHealedPayloadStub(rule: HealingRule): JsonPayload {
 	const healedPayload: JsonPayload = {};
 	const mapping = rule.mapping ?? {};
+	const addFields = rule.addFields ?? {};
 
 	for (const [, newKey] of Object.entries(mapping)) {
 		healedPayload[newKey] = "mapped_value";
+	}
+
+	for (const [key, value] of Object.entries(addFields)) {
+		healedPayload[key] = value;
 	}
 
 	return healedPayload;
