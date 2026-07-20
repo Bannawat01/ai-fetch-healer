@@ -1,9 +1,5 @@
-import type {
-	HealingRule,
-	JsonPayload,
-	JsonValue,
-	LLMResponse,
-} from "../types";
+import type { HealingRule, JsonValue, LLMResponse } from "../types";
+import { buildHealedPayloadStub, buildHealPrompt } from "./prompt";
 import { BaseLLMProvider } from "./provider";
 
 export class GeminiProvider extends BaseLLMProvider {
@@ -13,22 +9,7 @@ export class GeminiProvider extends BaseLLMProvider {
 	async heal(schema: JsonValue, errorDetails: string): Promise<LLMResponse> {
 		const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
 
-		const systemInstruction = `
-      You are an expert API auto-healing system.
-      The user tried to send a payload to an API, but it failed with an error.
-      Your task is to map the incorrect payload schema to the required format based on the error.
-      
-      Original Schema: ${JSON.stringify(schema)}
-      Error Details: ${errorDetails}
-      
-      Respond strictly in JSON format matching this structure:
-      {
-        "action": "MAP_FIELDS" | "CHANGE_TYPE" | "ADD_REQUIRED",
-        "mapping": { "old_key_name": "new_key_name" },
-				"typeChanges": { "field_name": "string" | "number" | "boolean" | "null" },
-        "suggestion": "Brief explanation of what was fixed"
-      }
-    `;
+		const systemInstruction = buildHealPrompt(schema, errorDetails);
 
 		const { controller, timeoutId } = this.createTimeoutController();
 		try {
@@ -63,13 +44,7 @@ export class GeminiProvider extends BaseLLMProvider {
 
 			const rule: HealingRule = JSON.parse(aiResponseText);
 
-			const healedPayload: JsonPayload = {};
-			const mapping = rule.mapping ?? {};
-			for (const [, newKey] of Object.entries(mapping)) {
-				healedPayload[newKey] = "mapped_value";
-			}
-
-			return { healedPayload, rule };
+			return { healedPayload: buildHealedPayloadStub(rule), rule };
 		} catch (error: unknown) {
 			if (error instanceof Error && error.name === "AbortError") {
 				throw new Error("Gemini request timed out");

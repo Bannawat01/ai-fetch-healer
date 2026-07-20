@@ -1,9 +1,5 @@
-import type {
-	HealingRule,
-	JsonPayload,
-	JsonValue,
-	LLMResponse,
-} from "../types";
+import type { HealingRule, JsonValue, LLMResponse } from "../types";
+import { buildHealedPayloadStub, buildHealPrompt } from "./prompt";
 import { BaseLLMProvider } from "./provider";
 
 export interface OpenRouterProviderOptions {
@@ -71,20 +67,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
 	async heal(schema: JsonValue, errorDetails: string): Promise<LLMResponse> {
 		const url = "https://openrouter.ai/api/v1/chat/completions";
 
-		const systemInstruction = `
-      You are an expert API auto-healing system. 
-      Analyze the failed payload schema and error message to provide a fix.
-      Original Schema: ${JSON.stringify(schema)}
-      Error: ${errorDetails}
-      
-      Respond strictly in JSON:
-      {
-        "action": "MAP_FIELDS" | "CHANGE_TYPE",
-        "mapping": { "old_key": "new_key" },
-				"typeChanges": { "field_name": "string" | "number" | "boolean" | "null" },
-        "suggestion": "string"
-      }
-    `;
+		const systemInstruction = buildHealPrompt(schema, errorDetails);
 
 		const { controller, timeoutId } = this.createTimeoutController();
 		try {
@@ -124,13 +107,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
 
 			const rule: HealingRule = JSON.parse(aiContent);
 
-			const healedPayload: JsonPayload = {};
-			const mapping = rule.mapping ?? {};
-			for (const [, newKey] of Object.entries(mapping)) {
-				healedPayload[newKey] = "mapped_value";
-			}
-
-			return { healedPayload, rule };
+			return { healedPayload: buildHealedPayloadStub(rule), rule };
 		} catch (error: unknown) {
 			if (error instanceof Error && error.name === "AbortError") {
 				throw new Error("OpenRouter request timed out");
