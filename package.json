@@ -38,7 +38,8 @@
 		"test": "vitest",
 		"test:run": "vitest run",
 		"lint": "biome check .",
-		"format": "biome format --write ."
+		"format": "biome format --write .",
+		"release": "semantic-release"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.11",
