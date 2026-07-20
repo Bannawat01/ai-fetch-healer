@@ -1,12 +1,35 @@
 import type { HealingRule, JsonValue } from "../types";
 
-export class HeuristicCache {
-	private cache: Map<string, HealingRule>;
-	private readonly maxEntries: number;
+interface CacheEntry {
+	rule: HealingRule;
+	expiresAt: number | null;
+}
 
-	constructor(maxEntries: number = 1000) {
+export interface HeuristicCacheOptions {
+	maxEntries?: number;
+	ttlMs?: number;
+}
+
+export class HeuristicCache {
+	private cache: Map<string, CacheEntry>;
+	private readonly maxEntries: number;
+	private readonly ttlMs: number | null;
+
+	constructor(maxEntries?: number, ttlMs?: number);
+	constructor(options: HeuristicCacheOptions);
+	constructor(
+		maxEntriesOrOptions: number | HeuristicCacheOptions = 1000,
+		ttlMs?: number,
+	) {
 		this.cache = new Map();
-		this.maxEntries = maxEntries;
+
+		if (typeof maxEntriesOrOptions === "object") {
+			this.maxEntries = maxEntriesOrOptions.maxEntries ?? 1000;
+			this.ttlMs = maxEntriesOrOptions.ttlMs ?? null;
+		} else {
+			this.maxEntries = maxEntriesOrOptions;
+			this.ttlMs = ttlMs ?? null;
+		}
 	}
 
 	generateKey(method: string, url: string, maskedPayload: JsonValue): string {
@@ -16,21 +39,38 @@ export class HeuristicCache {
 	}
 
 	set(key: string, rule: HealingRule): void {
-		if (!this.cache.has(key) && this.cache.size >= this.maxEntries) {
+		this.cache.delete(key);
+
+		if (this.cache.size >= this.maxEntries) {
 			const oldestKey = this.cache.keys().next().value;
 			if (oldestKey) {
 				this.cache.delete(oldestKey);
 			}
 		}
-		this.cache.set(key, rule);
+
+		const expiresAt = this.ttlMs !== null ? Date.now() + this.ttlMs : null;
+		this.cache.set(key, { rule, expiresAt });
 	}
 
 	get(key: string): HealingRule | null {
-		return this.cache.get(key) || null;
+		const entry = this.cache.get(key);
+		if (!entry) {
+			return null;
+		}
+
+		if (entry.expiresAt !== null && entry.expiresAt <= Date.now()) {
+			this.cache.delete(key);
+			return null;
+		}
+
+		this.cache.delete(key);
+		this.cache.set(key, entry);
+
+		return entry.rule;
 	}
 
 	has(key: string): boolean {
-		return this.cache.has(key);
+		return this.get(key) !== null;
 	}
 
 	clear(): void {
