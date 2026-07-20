@@ -94,7 +94,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
 				headers: {
 					Authorization: `Bearer ${this.apiKey}`,
 					"Content-Type": "application/json",
-					"HTTP-Referer": "https://github.com/bannawat-r/ai-fetch-healer",
+					"HTTP-Referer": "https://github.com/Bannawat01/ai-fetch-healer",
 					"X-Title": "AI Fetch Healer",
 				},
 				body: JSON.stringify({

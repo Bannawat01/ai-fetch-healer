@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/ai-fetch-healer"><img alt="npm version" src="https://img.shields.io/npm/v/ai-fetch-healer.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
-  <a href="https://github.com/bannawat-r/ai-fetch-healer/actions/workflows/ci.yml"><img alt="Build Status" src="https://github.com/bannawat-r/ai-fetch-healer/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/Bannawat01/ai-fetch-healer/actions/workflows/ci.yml"><img alt="Build Status" src="https://github.com/Bannawat01/ai-fetch-healer/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
 Production-ready runtime API auto-healing for JavaScript and TypeScript applications.
