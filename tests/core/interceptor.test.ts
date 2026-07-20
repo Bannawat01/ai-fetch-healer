@@ -112,4 +112,139 @@ describe("createHealedFetch", () => {
 			isActive: "maybe",
 		});
 	});
+
+	it("skips healed retry for non-idempotent method when allowUnsafeRetry is false", async () => {
+		const provider: ILLMProvider = {
+			name: "MockProvider",
+			heal: vi.fn().mockResolvedValue({
+				healedPayload: {},
+				rule: { action: "MAP_FIELDS", mapping: { name: "full_name" } },
+			}),
+		};
+
+		const fetchMock = vi.fn().mockResolvedValueOnce(
+			new Response("invalid payload", {
+				status: 400,
+				statusText: "Bad Request",
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+			allowUnsafeRetry: false,
+		});
+
+		const result = await healedFetch("https://api.example.com/users", {
+			method: "POST",
+			body: JSON.stringify({ name: "Alice" }),
+		});
+
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(provider.heal).not.toHaveBeenCalled();
+		expect(result.status).toBe(400);
+	});
+
+	it("retries non-idempotent method by default (allowUnsafeRetry defaults true)", async () => {
+		const provider: ILLMProvider = {
+			name: "MockProvider",
+			heal: vi.fn().mockResolvedValue({
+				healedPayload: {},
+				rule: { action: "MAP_FIELDS", mapping: { name: "full_name" } },
+			}),
+		};
+
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(
+			new Response("invalid payload", {
+				status: 400,
+				statusText: "Bad Request",
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response('{"ok":true}', {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+		});
+
+		await healedFetch("https://api.example.com/users", {
+			method: "POST",
+			body: JSON.stringify({ name: "Alice" }),
+		});
+
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("only heals statuses listed in healableStatuses", async () => {
+		const provider: ILLMProvider = {
+			name: "MockProvider",
+			heal: vi.fn().mockResolvedValue({
+				healedPayload: {},
+				rule: { action: "MAP_FIELDS", mapping: { name: "full_name" } },
+			}),
+		};
+
+		const fetchMock = vi.fn().mockResolvedValueOnce(
+			new Response("invalid payload", {
+				status: 409,
+				statusText: "Conflict",
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+		});
+
+		const result = await healedFetch("https://api.example.com/users", {
+			method: "POST",
+			body: JSON.stringify({ name: "Alice" }),
+		});
+
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(result.status).toBe(409);
+	});
+
+	it("heals a custom status when configured via healableStatuses", async () => {
+		const provider: ILLMProvider = {
+			name: "MockProvider",
+			heal: vi.fn().mockResolvedValue({
+				healedPayload: {},
+				rule: { action: "MAP_FIELDS", mapping: { name: "full_name" } },
+			}),
+		};
+
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(
+			new Response("invalid payload", {
+				status: 409,
+				statusText: "Conflict",
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response('{"ok":true}', {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+			healableStatuses: [409],
+		});
+
+		await healedFetch("https://api.example.com/users", {
+			method: "POST",
+			body: JSON.stringify({ name: "Alice" }),
+		});
+
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
 });

@@ -13,7 +13,18 @@ export interface HealerConfig {
 	cache?: HeuristicCache;
 	masker?: PayloadMasker;
 	maxErrorDetailsChars?: number;
+	healableStatuses?: number[];
+	/**
+	 * The original request must have failed (400/422) for a healed retry to
+	 * fire, so under normal conditions the retry is the only send that ever
+	 * succeeds. Set false only if the upstream API is known to apply side
+	 * effects (e.g. partial writes) even on a rejected non-idempotent request.
+	 */
+	allowUnsafeRetry?: boolean;
 }
+
+const DEFAULT_HEALABLE_STATUSES = [400, 422];
+const IDEMPOTENT_METHODS = new Set(["GET", "HEAD", "PUT", "DELETE", "OPTIONS"]);
 
 const globalCache = new HeuristicCache();
 const globalMasker = new Masker();
@@ -120,6 +131,8 @@ export function createHealedFetch(
 	const cache = config.cache || globalCache;
 	const masker = config.masker || globalMasker;
 	const maxErrorDetailsChars = config.maxErrorDetailsChars ?? 4000;
+	const healableStatuses = config.healableStatuses ?? DEFAULT_HEALABLE_STATUSES;
+	const allowUnsafeRetry = config.allowUnsafeRetry ?? true;
 
 	return async function healedFetch(
 		input: RequestInfo | URL,
@@ -127,7 +140,7 @@ export function createHealedFetch(
 	): Promise<Response> {
 		const response = await baseFetch(input, init);
 
-		if (response.ok || ![400, 422].includes(response.status)) {
+		if (response.ok || !healableStatuses.includes(response.status)) {
 			return response;
 		}
 
@@ -168,7 +181,25 @@ export function createHealedFetch(
 
 			const maskedSchema = masker.mask(originalPayload);
 
-			const method = init.method || "GET";
+			const method = (init.method || "GET").toUpperCase();
+			const isIdempotent = IDEMPOTENT_METHODS.has(method);
+
+			if (!isIdempotent && !allowUnsafeRetry) {
+				console.warn(
+					`[ai-fetch-healer] Skipping healed retry for non-idempotent method "${method}". ` +
+						"Set allowUnsafeRetry: true (default) to allow it.",
+				);
+				return ensureReadableResponse(response);
+			}
+
+			if (!isIdempotent) {
+				console.warn(
+					`[ai-fetch-healer] Retrying non-idempotent method "${method}" with healed payload. ` +
+						"The original request failed validation (no side effect expected), but set " +
+						"allowUnsafeRetry: false if your upstream API may apply partial writes on rejected requests.",
+				);
+			}
+
 			const urlStr =
 				typeof input === "string"
 					? input
