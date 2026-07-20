@@ -565,4 +565,43 @@ describe("createHealedFetch", () => {
 
 		expect(healedBody.amount).toBe(100);
 	});
+
+	it("rejects a rule whose addFields carries an empty-string value and calls onHealFail", async () => {
+		const provider: ILLMProvider = {
+			name: "MockProvider",
+			heal: vi.fn().mockResolvedValue({
+				healedPayload: {},
+				rule: {
+					action: "ADD_REQUIRED",
+					addFields: { full_name: "" },
+					suggestion: "Added the required field",
+				},
+			}),
+		};
+
+		const fetchMock = vi.fn().mockResolvedValueOnce(
+			new Response('{"error":"full_name is required"}', {
+				status: 422,
+				statusText: "Unprocessable Entity",
+				headers: { "content-type": "application/json" },
+			}),
+		);
+
+		const onHealFail = vi.fn();
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+			cache: new HeuristicCache(),
+			onHealFail,
+		});
+
+		const result = await healedFetch("https://api.example.com/users", {
+			method: "POST",
+			body: JSON.stringify({ email: "a@example.com" }),
+		});
+
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(result.status).toBe(422);
+		expect(onHealFail).toHaveBeenCalledTimes(1);
+		expect(onHealFail).toHaveBeenCalledWith(expect.any(Error));
+	});
 });

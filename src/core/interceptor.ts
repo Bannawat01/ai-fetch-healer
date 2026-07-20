@@ -101,8 +101,17 @@ function isTypeChangeMap(
 	);
 }
 
+function isNonEmptyValue(v: JsonValue): boolean {
+	return !(typeof v === "string" && v.trim() === "");
+}
+
 function isPlainRecord(value: unknown): value is Record<string, JsonValue> {
-	return !!value && typeof value === "object" && !Array.isArray(value);
+	return (
+		!!value &&
+		typeof value === "object" &&
+		!Array.isArray(value) &&
+		Object.values(value as Record<string, JsonValue>).every(isNonEmptyValue)
+	);
 }
 
 function isHealingRule(value: unknown): value is HealingRule {

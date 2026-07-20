@@ -22,7 +22,7 @@ Respond strictly in JSON format matching this structure. Only include the object
   "action": "MAP_FIELDS" | "CHANGE_TYPE" | "ADD_REQUIRED",
   "mapping": { "old_key_name": "new_key_name" },
   "typeChanges": { "field_name": "string" | "number" | "boolean" | "null" },
-  "addFields": { "missing_field_name": "<a reasonable default value of the correct type>" },
+  "addFields": { "missing_field_name": "<a plausible non-empty value of the correct type - never an empty string, null, or placeholder like 'N/A' unless the error/schema genuinely gives no signal>" },
   "suggestion": "Brief explanation of what was fixed"
 }
 `;
