@@ -1,4 +1,4 @@
-import type { ILLMProvider, LLMResponse } from "../types";
+import type { ILLMProvider, JsonValue, LLMResponse } from "../types";
 
 export abstract class BaseLLMProvider implements ILLMProvider {
 	abstract name: string;
@@ -39,5 +39,5 @@ export abstract class BaseLLMProvider implements ILLMProvider {
 		return await response.text();
 	}
 
-	abstract heal(schema: unknown, errorDetails: string): Promise<LLMResponse>;
+	abstract heal(schema: JsonValue, errorDetails: string): Promise<LLMResponse>;
 }

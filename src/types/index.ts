@@ -22,9 +22,5 @@ export interface LLMResponse {
 
 export interface ILLMProvider {
 	name: string;
-	heal(
-		schema: JsonValue,
-		errorDetails: string,
-		targetSchema?: JsonValue,
-	): Promise<LLMResponse>;
+	heal(schema: JsonValue, errorDetails: string): Promise<LLMResponse>;
 }
