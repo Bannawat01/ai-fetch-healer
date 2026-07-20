@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { HeuristicCache } from "../../src/core/cache";
 import { createHealedFetch } from "../../src/core/interceptor";
 import type { ILLMProvider } from "../../src/types";
 
@@ -171,6 +172,7 @@ describe("createHealedFetch", () => {
 
 		const healedFetch = createHealedFetch(provider, {
 			fetchFunction: fetchMock as unknown as typeof fetch,
+			cache: new HeuristicCache(),
 		});
 
 		await healedFetch("https://api.example.com/users", {
@@ -200,6 +202,7 @@ describe("createHealedFetch", () => {
 
 		const healedFetch = createHealedFetch(provider, {
 			fetchFunction: fetchMock as unknown as typeof fetch,
+			cache: new HeuristicCache(),
 		});
 
 		const result = await healedFetch("https://api.example.com/users", {
@@ -238,6 +241,7 @@ describe("createHealedFetch", () => {
 		const healedFetch = createHealedFetch(provider, {
 			fetchFunction: fetchMock as unknown as typeof fetch,
 			healableStatuses: [409],
+			cache: new HeuristicCache(),
 		});
 
 		await healedFetch("https://api.example.com/users", {
@@ -246,5 +250,74 @@ describe("createHealedFetch", () => {
 		});
 
 		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("retries provider.heal() on failure with backoff, then succeeds", async () => {
+		const heal = vi
+			.fn()
+			.mockRejectedValueOnce(new Error("network blip"))
+			.mockResolvedValueOnce({
+				healedPayload: {},
+				rule: { action: "MAP_FIELDS", mapping: { name: "full_name" } },
+			});
+		const provider: ILLMProvider = { name: "MockProvider", heal };
+
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(
+			new Response("invalid payload", {
+				status: 400,
+				statusText: "Bad Request",
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response('{"ok":true}', {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+			healRetryBaseMs: 1,
+			cache: new HeuristicCache(),
+		});
+
+		const result = await healedFetch("https://api.example.com/users", {
+			method: "POST",
+			body: JSON.stringify({ name: "Alice" }),
+		});
+
+		expect(heal).toHaveBeenCalledTimes(2);
+		expect(result.status).toBe(200);
+	});
+
+	it("gives up after exhausting healRetries and fails open", async () => {
+		const heal = vi.fn().mockRejectedValue(new Error("persistent failure"));
+		const provider: ILLMProvider = { name: "MockProvider", heal };
+
+		const fetchMock = vi.fn().mockResolvedValueOnce(
+			new Response("invalid payload", {
+				status: 400,
+				statusText: "Bad Request",
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+			healRetries: 1,
+			healRetryBaseMs: 1,
+			cache: new HeuristicCache(),
+		});
+
+		const result = await healedFetch("https://api.example.com/users", {
+			method: "POST",
+			body: JSON.stringify({ name: "Alice" }),
+		});
+
+		expect(heal).toHaveBeenCalledTimes(2);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(result.status).toBe(400);
 	});
 });

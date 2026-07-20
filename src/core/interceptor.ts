@@ -21,10 +21,45 @@ export interface HealerConfig {
 	 * effects (e.g. partial writes) even on a rejected non-idempotent request.
 	 */
 	allowUnsafeRetry?: boolean;
+	/** Attempts for provider.heal() on failure (network/timeout). Default 2. */
+	healRetries?: number;
+	/** Base delay in ms for exponential backoff between heal attempts. Default 250. */
+	healRetryBaseMs?: number;
 }
 
 const DEFAULT_HEALABLE_STATUSES = [400, 422];
 const IDEMPOTENT_METHODS = new Set(["GET", "HEAD", "PUT", "DELETE", "OPTIONS"]);
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function healWithRetry(
+	provider: ILLMProvider,
+	schema: JsonValue,
+	errorDetails: string,
+	retries: number,
+	baseMs: number,
+): Promise<Awaited<ReturnType<ILLMProvider["heal"]>>> {
+	let lastError: unknown;
+
+	for (let attempt = 0; attempt <= retries; attempt++) {
+		try {
+			return await provider.heal(schema, errorDetails);
+		} catch (error) {
+			lastError = error;
+
+			if (attempt < retries) {
+				console.warn(
+					`[ai-fetch-healer] provider.heal() attempt ${attempt + 1} failed, retrying...`,
+				);
+				await sleep(baseMs * 2 ** attempt);
+			}
+		}
+	}
+
+	throw lastError;
+}
 
 const globalCache = new HeuristicCache();
 const globalMasker = new Masker();
@@ -133,6 +168,8 @@ export function createHealedFetch(
 	const maxErrorDetailsChars = config.maxErrorDetailsChars ?? 4000;
 	const healableStatuses = config.healableStatuses ?? DEFAULT_HEALABLE_STATUSES;
 	const allowUnsafeRetry = config.allowUnsafeRetry ?? true;
+	const healRetries = config.healRetries ?? 2;
+	const healRetryBaseMs = config.healRetryBaseMs ?? 250;
 
 	return async function healedFetch(
 		input: RequestInfo | URL,
@@ -214,7 +251,13 @@ export function createHealedFetch(
 				console.log(
 					`[ai-fetch-healer] Cache miss. Consulting AI (${provider.name})...`,
 				);
-				const healResult = await provider.heal(maskedSchema, errorDetails);
+				const healResult = await healWithRetry(
+					provider,
+					maskedSchema,
+					errorDetails,
+					healRetries,
+					healRetryBaseMs,
+				);
 				healingRule = healResult.rule;
 
 				if (!isHealingRule(healingRule)) {
