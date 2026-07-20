@@ -70,11 +70,12 @@ export class GeminiProvider extends BaseLLMProvider {
 			}
 
 			return { healedPayload, rule };
-		} catch (error: any) {
-			if (error?.name === "AbortError") {
+		} catch (error: unknown) {
+			if (error instanceof Error && error.name === "AbortError") {
 				throw new Error("Gemini request timed out");
 			}
-			throw new Error(`Failed to heal via Gemini: ${error.message}`);
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(`Failed to heal via Gemini: ${message}`);
 		} finally {
 			clearTimeout(timeoutId);
 		}

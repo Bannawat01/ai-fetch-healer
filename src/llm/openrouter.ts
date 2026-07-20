@@ -131,11 +131,12 @@ export class OpenRouterProvider extends BaseLLMProvider {
 			}
 
 			return { healedPayload, rule };
-		} catch (error: any) {
-			if (error?.name === "AbortError") {
+		} catch (error: unknown) {
+			if (error instanceof Error && error.name === "AbortError") {
 				throw new Error("OpenRouter request timed out");
 			}
-			throw new Error(`Failed to heal via OpenRouter: ${error.message}`);
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(`Failed to heal via OpenRouter: ${message}`);
 		} finally {
 			clearTimeout(timeoutId);
 		}
