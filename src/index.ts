@@ -1,5 +1,5 @@
-export { HeuristicCache } from "./core/cache";
-export type { HealerConfig } from "./core/interceptor";
+export { HeuristicCache, type HeuristicCacheOptions } from "./core/cache";
+export type { HealEvent, HealerConfig, Logger } from "./core/interceptor";
 export { createHealedFetch } from "./core/interceptor";
 export { GeminiProvider } from "./llm/gemini";
 export type { OpenRouterProviderOptions } from "./llm/openrouter";

@@ -8,6 +8,16 @@ import type {
 } from "../types";
 import { HeuristicCache } from "./cache";
 
+export interface Logger {
+	log(...args: unknown[]): void;
+	warn(...args: unknown[]): void;
+}
+
+export interface HealEvent {
+	rule: HealingRule;
+	source: "llm" | "cache";
+}
+
 export interface HealerConfig {
 	fetchFunction?: typeof fetch;
 	cache?: HeuristicCache;
@@ -25,6 +35,12 @@ export interface HealerConfig {
 	healRetries?: number;
 	/** Base delay in ms for exponential backoff between heal attempts. Default 250. */
 	healRetryBaseMs?: number;
+	/** Defaults to `console`. Pass a no-op logger to silence all output. */
+	logger?: Logger;
+	/** Called once a healing rule (from cache or a fresh LLM call) is about to be applied. */
+	onHeal?: (event: HealEvent) => void;
+	/** Called when provider.heal() exhausts retries, or the rule it returns fails validation. */
+	onHealFail?: (error: unknown) => void;
 }
 
 const DEFAULT_HEALABLE_STATUSES = [400, 422];
@@ -40,6 +56,7 @@ async function healWithRetry(
 	errorDetails: string,
 	retries: number,
 	baseMs: number,
+	logger: Logger,
 ): Promise<Awaited<ReturnType<ILLMProvider["heal"]>>> {
 	let lastError: unknown;
 
@@ -50,7 +67,7 @@ async function healWithRetry(
 			lastError = error;
 
 			if (attempt < retries) {
-				console.warn(
+				logger.warn(
 					`[ai-fetch-healer] provider.heal() attempt ${attempt + 1} failed, retrying...`,
 				);
 				await sleep(baseMs * 2 ** attempt);
@@ -170,6 +187,9 @@ export function createHealedFetch(
 	const allowUnsafeRetry = config.allowUnsafeRetry ?? true;
 	const healRetries = config.healRetries ?? 2;
 	const healRetryBaseMs = config.healRetryBaseMs ?? 250;
+	const logger = config.logger ?? console;
+	const onHeal = config.onHeal;
+	const onHealFail = config.onHealFail;
 
 	return async function healedFetch(
 		input: RequestInfo | URL,
@@ -222,7 +242,7 @@ export function createHealedFetch(
 			const isIdempotent = IDEMPOTENT_METHODS.has(method);
 
 			if (!isIdempotent && !allowUnsafeRetry) {
-				console.warn(
+				logger.warn(
 					`[ai-fetch-healer] Skipping healed retry for non-idempotent method "${method}". ` +
 						"Set allowUnsafeRetry: true (default) to allow it.",
 				);
@@ -230,7 +250,7 @@ export function createHealedFetch(
 			}
 
 			if (!isIdempotent) {
-				console.warn(
+				logger.warn(
 					`[ai-fetch-healer] Retrying non-idempotent method "${method}" with healed payload. ` +
 						"The original request failed validation (no side effect expected), but set " +
 						"allowUnsafeRetry: false if your upstream API may apply partial writes on rejected requests.",
@@ -248,30 +268,42 @@ export function createHealedFetch(
 			let healingRule = cache.get(cacheKey);
 
 			if (!healingRule) {
-				console.log(
+				logger.log(
 					`[ai-fetch-healer] Cache miss. Consulting AI (${provider.name})...`,
 				);
-				const healResult = await healWithRetry(
-					provider,
-					maskedSchema,
-					errorDetails,
-					healRetries,
-					healRetryBaseMs,
-				);
+
+				let healResult: Awaited<ReturnType<ILLMProvider["heal"]>>;
+				try {
+					healResult = await healWithRetry(
+						provider,
+						maskedSchema,
+						errorDetails,
+						healRetries,
+						healRetryBaseMs,
+						logger,
+					);
+				} catch (healError) {
+					onHealFail?.(healError);
+					throw healError;
+				}
+
 				healingRule = healResult.rule;
 
 				if (!isHealingRule(healingRule)) {
-					console.warn(
+					logger.warn(
 						"[ai-fetch-healer] Invalid healing rule from provider. Returning original response.",
 					);
+					onHealFail?.(new Error("Provider returned an invalid healing rule"));
 					return ensureReadableResponse(response);
 				}
 
 				cache.set(cacheKey, healingRule);
+				onHeal?.({ rule: healingRule, source: "llm" });
 			} else {
-				console.log(
+				logger.log(
 					"[ai-fetch-healer] Cache hit! Applying healing rule locally.",
 				);
+				onHeal?.({ rule: healingRule, source: "cache" });
 			}
 
 			if (!healingRule.mapping && !healingRule.typeChanges) {
@@ -282,7 +314,7 @@ export function createHealedFetch(
 				healingRule.action !== "MAP_FIELDS" &&
 				healingRule.action !== "CHANGE_TYPE"
 			) {
-				console.warn(
+				logger.warn(
 					`[ai-fetch-healer] Unsupported action "${healingRule.action}". Applying mapping fallback.`,
 				);
 			}
@@ -317,7 +349,7 @@ export function createHealedFetch(
 
 			return await baseFetch(input, healedInit);
 		} catch (error) {
-			console.warn(
+			logger.warn(
 				"[ai-fetch-healer] Auto-healing failed, returning original response.",
 				error,
 			);
