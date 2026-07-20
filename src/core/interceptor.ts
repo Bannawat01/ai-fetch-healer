@@ -26,7 +26,9 @@ function isStringMap(value: unknown): value is Record<string, string> {
 	return Object.values(value).every((v) => typeof v === "string");
 }
 
-function isTypeChangeMap(value: unknown): value is Record<string, JsonScalarType> {
+function isTypeChangeMap(
+	value: unknown,
+): value is Record<string, JsonScalarType> {
 	if (!value || typeof value !== "object") {
 		return false;
 	}
@@ -46,12 +48,16 @@ function isHealingRule(value: unknown): value is HealingRule {
 	const validMapping =
 		candidate.mapping === undefined || isStringMap(candidate.mapping);
 	const validTypeChanges =
-		candidate.typeChanges === undefined || isTypeChangeMap(candidate.typeChanges);
+		candidate.typeChanges === undefined ||
+		isTypeChangeMap(candidate.typeChanges);
 
 	return validAction && validMapping && validTypeChanges;
 }
 
-function coerceJsonValue(value: JsonValue, targetType: JsonScalarType): JsonValue {
+function coerceJsonValue(
+	value: JsonValue,
+	targetType: JsonScalarType,
+): JsonValue {
 	if (targetType === "string") {
 		return String(value);
 	}
