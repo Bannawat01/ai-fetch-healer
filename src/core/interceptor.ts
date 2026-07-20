@@ -175,6 +175,13 @@ function ensureReadableResponse(response: Response): Response {
 	return response;
 }
 
+/**
+ * Wraps `fetch` (or `config.fetchFunction`) so requests that fail with a
+ * healable status (default 400/422) get a schema-fix rule from `provider`,
+ * applied, and retried once. Any failure along the healing path - masking,
+ * the provider call, an invalid rule - falls back to returning the original
+ * response untouched; healing never throws to the caller.
+ */
 export function createHealedFetch(
 	provider: ILLMProvider,
 	config: HealerConfig = {},

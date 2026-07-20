@@ -6,10 +6,17 @@ interface CacheEntry {
 }
 
 export interface HeuristicCacheOptions {
+	/** Max entries before the least-recently-used one is evicted. Default 1000. */
 	maxEntries?: number;
+	/** Entry lifetime in ms. Omit (or leave undefined) to never expire entries. */
 	ttlMs?: number;
 }
 
+/**
+ * LRU cache of healing rules, keyed by method+url+masked-payload-shape.
+ * `get()` bumps an entry's recency; eviction at capacity removes the entry
+ * that has gone longest without a `get()` hit, not the oldest-inserted one.
+ */
 export class HeuristicCache {
 	private cache: Map<string, CacheEntry>;
 	private readonly maxEntries: number;

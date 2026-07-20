@@ -4,10 +4,17 @@ import { BaseLLMProvider } from "./provider";
 
 export interface OpenRouterProviderOptions {
 	apiKey?: string;
+	/** Any OpenRouter-routed model id. Default "google/gemini-2.0-flash-001". */
 	model?: string;
 	timeoutMs?: number;
 }
 
+/**
+ * ILLMProvider backed by OpenRouter (OpenAI-compatible chat completions).
+ * Resolves the API key in order: constructor arg -> options.apiKey ->
+ * AI_HEALER_OPENROUTER_KEY -> OPENROUTER_API_KEY -> GEMINI_API_KEY (legacy fallback).
+ * Throws synchronously in the constructor if no key can be resolved.
+ */
 export class OpenRouterProvider extends BaseLLMProvider {
 	name = "OpenRouter";
 	private model: string;

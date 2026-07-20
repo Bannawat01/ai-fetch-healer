@@ -14,11 +14,14 @@ const DEFAULT_SENSITIVE_KEYS = [
 ];
 
 export interface MaskerOptions {
+	/** Extra key names to treat as sensitive, on top of the built-in defaults. */
 	additionalSensitiveKeys?: string[];
+	/** If set, every sensitive value is replaced with this exact string instead of a category-specific mask. */
 	maskingString?: string;
 }
 
 export interface PayloadMasker {
+	/** Returns a schema-only view of payload: sensitive values masked, everything else reduced to its type name. Never leaks raw values. */
 	mask(payload: unknown): JsonValue;
 }
 
@@ -26,6 +29,12 @@ function normalizeKey(value: string): string {
 	return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+/**
+ * Recursively strips a payload down to a schema-only shape before it's sent
+ * to an LLM provider: sensitive keys (email, password, tokens, etc.) become
+ * masked placeholders, everything else becomes its JS type name. This is the
+ * library's core privacy guarantee - raw values must never reach a provider.
+ */
 export class Masker implements PayloadMasker {
 	private readonly sensitiveKeys: Set<string>;
 	private readonly maskingString?: string;
@@ -117,6 +126,7 @@ export class Masker implements PayloadMasker {
 
 const defaultMasker = new Masker();
 
+/** Convenience wrapper around a default-configured `Masker`. Use `new Masker(options)` directly for custom sensitive keys. */
 export function maskPayload(payload: unknown): JsonValue {
 	return defaultMasker.mask(payload);
 }

@@ -2,6 +2,7 @@ import type { HealingRule, JsonValue, LLMResponse } from "../types";
 import { buildHealedPayloadStub, buildHealPrompt } from "./prompt";
 import { BaseLLMProvider } from "./provider";
 
+/** ILLMProvider backed by Google's Gemini API. Reads no env var itself - pass an apiKey via the BaseLLMProvider constructor. */
 export class GeminiProvider extends BaseLLMProvider {
 	name = "Gemini (Google)";
 	private model = "gemini-2.5-flash";
