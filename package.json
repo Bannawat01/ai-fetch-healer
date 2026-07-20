@@ -16,6 +16,9 @@
 		"type": "git",
 		"url": "https://github.com/Bannawat01/ai-fetch-healer.git"
 	},
+	"engines": {
+		"node": ">=18"
+	},
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
 	"types": "./dist/index.d.ts",
