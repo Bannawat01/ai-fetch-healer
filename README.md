@@ -74,13 +74,13 @@ import { OpenRouterProvider } from 'ai-fetch-healer';
 const fromEnv = new OpenRouterProvider();
 
 const withKeyAndOptions = new OpenRouterProvider('YOUR_KEY', {
-  model: 'google/gemini-2.0-flash-001',
+  model: 'openai/gpt-4o-mini',
   timeoutMs: 5000,
 });
 
 const optionsOnly = new OpenRouterProvider({
   apiKey: 'YOUR_KEY',
-  model: 'google/gemini-2.0-flash-001',
+  model: 'openai/gpt-4o-mini',
   timeoutMs: 5000,
 });
 ```
@@ -96,7 +96,7 @@ const optionsOnly = new OpenRouterProvider({
 import { OpenRouterProvider } from 'ai-fetch-healer';
 
 const provider = new OpenRouterProvider('YOUR_KEY', {
-  model: 'google/gemini-2.0-flash-001',
+  model: 'openai/gpt-4o-mini',
   timeoutMs: 5000,
 });
 ```

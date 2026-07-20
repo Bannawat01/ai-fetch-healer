@@ -4,7 +4,7 @@ import { BaseLLMProvider } from "./provider";
 
 export interface OpenRouterProviderOptions {
 	apiKey?: string;
-	/** Any OpenRouter-routed model id. Default "google/gemini-2.0-flash-001". */
+	/** Any OpenRouter-routed model id. Default "openai/gpt-4o-mini". */
 	model?: string;
 	timeoutMs?: number;
 }
@@ -57,7 +57,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
 			env?.OPENROUTER_API_KEY ||
 			env?.GEMINI_API_KEY;
 
-		const model = options.model ?? "google/gemini-2.0-flash-001";
+		const model = options.model ?? "openai/gpt-4o-mini";
 		const timeoutMs = options.timeoutMs ?? 10000;
 
 		if (!resolvedKey) {
@@ -96,6 +96,20 @@ export class OpenRouterProvider extends BaseLLMProvider {
 
 			if (!response.ok) {
 				const err = await response.text();
+
+				if (response.status === 404) {
+					throw new Error(
+						`OpenRouter Error: model "${this.model}" not found (404). ` +
+							`It may have been deprecated or renamed - check https://openrouter.ai/models for a valid model id. ${err}`,
+					);
+				}
+
+				if (response.status === 401) {
+					throw new Error(
+						`OpenRouter Error: authentication failed (401). Check your API key. ${err}`,
+					);
+				}
+
 				throw new Error(`OpenRouter Error: ${err}`);
 			}
 
