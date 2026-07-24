@@ -25,8 +25,10 @@ export interface PayloadMasker {
 	mask(payload: unknown): JsonValue;
 }
 
+const NON_ALPHANUMERIC = /[^a-z0-9]/g;
+
 function normalizeKey(value: string): string {
-	return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+	return value.toLowerCase().replace(NON_ALPHANUMERIC, "");
 }
 
 /**
@@ -54,8 +56,13 @@ export class Masker implements PayloadMasker {
 	}
 
 	private maskValue(payload: unknown, currentKey?: string): JsonValue {
-		if (currentKey && this.isSensitiveKey(currentKey)) {
-			return this.getSensitiveMask(currentKey);
+		if (currentKey !== undefined) {
+			// Normalize once - isSensitiveKey and getSensitiveMask both need it,
+			// and this runs on every key of every payload passed through mask().
+			const normalized = normalizeKey(currentKey);
+			if (this.isSensitiveKey(normalized)) {
+				return this.getSensitiveMask(normalized);
+			}
 		}
 
 		if (payload === null) {
@@ -85,11 +92,10 @@ export class Masker implements PayloadMasker {
 		return typeof payload;
 	}
 
-	private isSensitiveKey(key: string): boolean {
-		const normalized = normalizeKey(key);
-
+	/** @param normalizedKey Already run through normalizeKey(). */
+	private isSensitiveKey(normalizedKey: string): boolean {
 		for (const sensitive of this.sensitiveKeys) {
-			if (normalized.includes(sensitive)) {
+			if (normalizedKey.includes(sensitive)) {
 				return true;
 			}
 		}
@@ -97,12 +103,12 @@ export class Masker implements PayloadMasker {
 		return false;
 	}
 
-	private getSensitiveMask(key: string): JsonValue {
+	/** @param normalized Already run through normalizeKey(). */
+	private getSensitiveMask(normalized: string): JsonValue {
 		if (this.maskingString) {
 			return this.maskingString;
 		}
 
-		const normalized = normalizeKey(key);
 		if (normalized.includes("email")) return "masked_email";
 		if (normalized.includes("phone")) return "masked_phone";
 		if (normalized.includes("username") || normalized.includes("user"))
