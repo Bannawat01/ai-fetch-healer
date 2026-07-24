@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.5.0...v1.6.0) (2026-07-24)
+
+
+### Features
+
+* installGlobalHealing() to heal the global fetch process-wide ([e352b77](https://github.com/Bannawat01/ai-fetch-healer/commit/e352b77d4ad1b16db3bf3f50ffcabd9ad60a27bf))
+
 # [1.5.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.4.0...v1.5.0) (2026-07-24)
 
 
