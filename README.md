@@ -36,6 +36,7 @@ await healedFetch('https://api.example.com/users', {
 - [Why It Matters](#why-it-matters)
 - [How It Works](#how-it-works)
 - [Quick Start](#quick-start)
+- [CLI: `doctor`](#cli-doctor)
 - [Zero-Config Global Install](#zero-config-global-install)
 - [Supported Providers](#supported-providers)
 - [Framework Adapters](#framework-adapters)
@@ -124,6 +125,35 @@ const healedFetch = createHealedFetch(new OpenRouterProvider());
 ```
 
 Create `healedFetch` **once** per provider (module scope, not per-request) - a fresh instance every call defeats the built-in rule cache and forces an LLM round-trip on every single request. Building an Express or Next.js route around it? See [Framework Adapters](#framework-adapters) below.
+
+## CLI: `doctor`
+
+Before wiring healing into your app, confirm your environment is actually set up right:
+
+```bash
+npx ai-fetch-healer doctor
+```
+
+It reports which provider credentials are present (never printing a key value), which provider would be auto-selected, and then fires **one real `heal()` call** so a bad key or a dead model chain surfaces here instead of the first time a request fails in production:
+
+```
+ai-fetch-healer doctor
+
+Credentials in environment:
+  ✓ OpenAI (OPENAI_API_KEY)
+  · Anthropic (AI_HEALER_ANTHROPIC_KEY / ANTHROPIC_API_KEY) - not set
+  ...
+
+Provider selection:
+  ✓ Auto-selected OpenAI
+
+Live connectivity check:
+  ✓ OpenAI responded with a valid healing rule.
+
+Setup looks healthy.
+```
+
+Exit code is `0` when healthy, `1` when something is wrong (no credentials, bad key, unreachable model) - handy in a CI preflight. Pass `--offline` to skip the live call and only inspect environment variables.
 
 ## Zero-Config Global Install
 
