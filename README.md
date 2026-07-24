@@ -36,6 +36,7 @@ await healedFetch('https://api.example.com/users', {
 - [How It Works](#how-it-works)
 - [Quick Start](#quick-start)
 - [Supported Providers](#supported-providers)
+- [Framework Adapters](#framework-adapters)
 - [Configuration](#configuration)
 - [Observability](#observability)
 - [Security & Privacy (The Masker)](#security--privacy-the-masker)
@@ -119,7 +120,7 @@ import { createHealedFetch, OpenRouterProvider } from 'ai-fetch-healer';
 const healedFetch = createHealedFetch(new OpenRouterProvider());
 ```
 
-Create `healedFetch` **once** per provider (module scope, not per-request) - a fresh instance every call defeats the built-in rule cache and forces an LLM round-trip on every single request. See [`examples/`](./examples) for Express and Next.js integrations.
+Create `healedFetch` **once** per provider (module scope, not per-request) - a fresh instance every call defeats the built-in rule cache and forces an LLM round-trip on every single request. Building an Express or Next.js route around it? See [Framework Adapters](#framework-adapters) below.
 
 ## Supported Providers
 
@@ -167,6 +168,37 @@ const provider = new OllamaProvider({
   model: 'llama3.1',
 });
 ```
+
+## Framework Adapters
+
+Turn a `healedFetch` call into a ready-to-mount route handler - built in, no extra install:
+
+```ts
+// Any Web-standard Request/Response runtime: Next.js App Router, Bun, Deno, Cloudflare Workers, Remix, SvelteKit
+import { createHealedFetchFromEnv, createHealedRouteHandler } from 'ai-fetch-healer';
+
+const healedFetch = createHealedFetchFromEnv();
+
+// app/api/orders/route.ts
+export const POST = createHealedRouteHandler({
+  target: 'https://upstream.example.com/v1/orders',
+  healedFetch,
+});
+```
+
+```ts
+// Express
+import { createHealedFetchFromEnv, createHealedProxyMiddleware } from 'ai-fetch-healer';
+
+const healedFetch = createHealedFetchFromEnv();
+
+app.post('/users', createHealedProxyMiddleware({
+  target: 'https://upstream.example.com/v1/users',
+  healedFetch,
+}));
+```
+
+Neither adapter imports `next`/`express` - the Web adapter targets the standard global `Request`/`Response` objects, and the Express adapter is typed structurally (`ExpressLikeRequest`/`ExpressLikeResponse`), so a real Express `req`/`res` satisfies it without ai-fetch-healer ever depending on the `express` package. Zero runtime dependencies stays true even here. `target` can also be a function of the incoming request, for per-request upstream URLs.
 
 ## Configuration
 

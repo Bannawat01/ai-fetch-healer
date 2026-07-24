@@ -1,3 +1,11 @@
+export type {
+	ExpressLikeRequest,
+	ExpressLikeResponse,
+	HealedProxyMiddlewareOptions,
+} from "./adapters/express";
+export { createHealedProxyMiddleware } from "./adapters/express";
+export type { HealedRouteHandlerOptions } from "./adapters/web";
+export { createHealedRouteHandler } from "./adapters/web";
 export { HeuristicCache, type HeuristicCacheOptions } from "./core/cache";
 export {
 	createHealedFetchFromEnv,
