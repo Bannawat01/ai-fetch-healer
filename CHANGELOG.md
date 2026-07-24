@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.7.0...v1.8.0) (2026-07-24)
+
+
+### Features
+
+* add OpenAIProvider and AnthropicProvider ([e0e3cf0](https://github.com/Bannawat01/ai-fetch-healer/commit/e0e3cf077c635e59e50fa7b641b70e51b3230ca4))
+
 # [1.7.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.6.0...v1.7.0) (2026-07-24)
 
 
