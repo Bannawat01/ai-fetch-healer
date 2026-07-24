@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.9.0...v1.10.0) (2026-07-24)
+
+
+### Features
+
+* add `ai-fetch-healer doctor` CLI ([7737fb6](https://github.com/Bannawat01/ai-fetch-healer/commit/7737fb64ee76703de64974208b888201ac451870))
+
 # [1.9.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.8.0...v1.9.0) (2026-07-24)
 
 
