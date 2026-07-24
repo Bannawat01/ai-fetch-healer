@@ -314,6 +314,10 @@ The `Masker` and `HeuristicCache` code paths run on every healable-status respon
 
 The [`examples/`](./examples) directory has standalone snippets for real integration paths: a minimal Node script, an Express proxy route, a Next.js App Router handler, and the observability wiring shown above.
 
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/Bannawat01/ai-fetch-healer)
+
+That opens this repo in an editable in-browser IDE - useful for browsing/tweaking the source and the `examples/` snippets without cloning locally. It's not a hosted one-click demo: every example still needs your own LLM provider key (see [Quick Start](#quick-start)) to actually call `healedFetch`, since there's no shared API key to hand out.
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the dev setup, PR checklist, and a guide to adding a new LLM provider.
