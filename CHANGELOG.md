@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.6.0...v1.7.0) (2026-07-24)
+
+
+### Features
+
+* pluggable RuleStore for persisting healed rules across restarts ([2429828](https://github.com/Bannawat01/ai-fetch-healer/commit/242982821ade2c973bae89fa92e4914216da9d78))
+
 # [1.6.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.5.0...v1.6.0) (2026-07-24)
 
 
