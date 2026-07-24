@@ -89,6 +89,56 @@ describe("OpenRouterProvider", () => {
 		).rejects.toThrow(/authentication failed \(401\)/);
 	});
 
+	it("falls back to the next model when the first 404s", async () => {
+		const okBody = JSON.stringify({
+			choices: [
+				{
+					message: {
+						content: JSON.stringify({ action: "MAP_FIELDS", mapping: {} }),
+					},
+				},
+			],
+		});
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(new Response("model not found", { status: 404 }))
+			.mockResolvedValueOnce(
+				new Response(okBody, {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
+			);
+		vi.stubGlobal("fetch", fetchMock);
+
+		const provider = new OpenRouterProvider("test-api-key", {
+			models: ["vendor/dead", "vendor/live"],
+		});
+		const result = await provider.heal({ foo: "bar" }, "400 Bad Request");
+
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(JSON.parse(fetchMock.mock.calls[1][1].body as string).model).toBe(
+			"vendor/live",
+		);
+		expect(result.rule).toEqual({ action: "MAP_FIELDS", mapping: {} });
+	});
+
+	it("still surfaces the actionable 404 hint when the last model 404s", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(new Response("gone", { status: 404 }))
+			.mockResolvedValueOnce(new Response("gone", { status: 404 }));
+		vi.stubGlobal("fetch", fetchMock);
+
+		const provider = new OpenRouterProvider("test-api-key", {
+			models: ["vendor/dead-a", "vendor/dead-b"],
+		});
+
+		await expect(
+			provider.heal({ foo: "bar" }, "400 Bad Request"),
+		).rejects.toThrow(/vendor\/dead-b.*openrouter\.ai\/models/s);
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
 	it("defaults to a currently-active model id", () => {
 		// Regression guard: the previous default (google/gemini-2.0-flash-001)
 		// was deprecated by OpenRouter and 404s on every request out of the box.

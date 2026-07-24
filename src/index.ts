@@ -4,6 +4,12 @@ export { createHealedFetch } from "./core/interceptor";
 export { GeminiProvider } from "./llm/gemini";
 export type { GroqProviderOptions } from "./llm/groq";
 export { GroqProvider } from "./llm/groq";
+export type { ProviderKey } from "./llm/models";
+export {
+	DEFAULT_MODELS,
+	isModelUnavailableError,
+	resolveModelChain,
+} from "./llm/models";
 export type { OllamaProviderOptions } from "./llm/ollama";
 export { OllamaProvider } from "./llm/ollama";
 export type { OpenRouterProviderOptions } from "./llm/openrouter";
