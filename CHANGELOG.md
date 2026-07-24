@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.2.0...v1.3.0) (2026-07-24)
+
+
+### Features
+
+* createHealedFetchFromEnv - zero-config provider auto-detection ([93ddb07](https://github.com/Bannawat01/ai-fetch-healer/commit/93ddb07fd8c208c58d6f3bee07dc41fed8516063))
+
 # [1.2.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.1.0...v1.2.0) (2026-07-24)
 
 
