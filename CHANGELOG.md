@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.3.0...v1.3.1) (2026-07-24)
+
+
+### Performance Improvements
+
+* hoist regex + dedupe key normalization in Masker hot path ([9f29614](https://github.com/Bannawat01/ai-fetch-healer/commit/9f296141cbb598eccd9949b4f577f6aeae76c38f))
+
 # [1.3.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.2.0...v1.3.0) (2026-07-24)
 
 
