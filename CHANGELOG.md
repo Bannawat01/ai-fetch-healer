@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.4.0...v1.5.0) (2026-07-24)
+
+
+### Features
+
+* wire up code coverage measurement and Codecov upload ([e151143](https://github.com/Bannawat01/ai-fetch-healer/commit/e1511430f7bd05de91b6e0d5600e546e5a0a40c7))
+
 # [1.4.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.3.1...v1.4.0) (2026-07-24)
 
 
