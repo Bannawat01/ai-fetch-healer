@@ -238,6 +238,7 @@ Neither adapter imports `next`/`express` - the Web adapter targets the standard 
 | `store` | - | Persistent [rule store](#persistent-rule-store) (file, Redis, KV, ...). Takes precedence over `cache`. Store errors degrade to a cache miss - a broken store never breaks healing |
 | `masker` | shared `Masker` | Bring your own PII-masking rules |
 | `healableStatuses` | `[400, 422]` | Which response statuses trigger healing |
+| `dryRun` | `false` | Audit mode: analyze the failure and report the rule via `onHeal` (`{ dryRun: true }`), but never send the healed retry. See what healing *would* do in production before it touches live traffic |
 | `allowUnsafeRetry` | `true` | Retry non-idempotent methods (`POST`/`PATCH`/...) with the healed payload. The original request already failed, so under normal conditions the retry is the only send that succeeds - set `false` only if your upstream API is known to apply partial writes even on rejected requests |
 | `healRetries` | `2` | Retry attempts for `provider.heal()` on network/timeout failure |
 | `healRetryBaseMs` | `250` | Base delay for exponential backoff between heal attempts |
@@ -308,6 +309,23 @@ const healedFetch = createHealedFetch(new OpenRouterProvider(), {
 ```
 
 See [`examples/observability.ts`](./examples/observability.ts) for a full example.
+
+### Dry-run / audit mode
+
+Roll healing out safely: run with `dryRun: true` first to see exactly what it *would* do without letting it mutate a single live request. The failure is analyzed and the rule is reported through `onHeal` with a `dryRun: true` flag, but the healed retry is never sent - the caller gets the original response untouched.
+
+```ts
+const healedFetch = createHealedFetch(new OpenRouterProvider(), {
+  dryRun: true,
+  onHeal: (event) => {
+    if (event.dryRun) {
+      logger.info('would heal', { source: event.source, rule: event.rule });
+    }
+  },
+});
+```
+
+Watch the logs for a while; once the proposed rules look right, drop `dryRun` and healing goes live.
 
 ## Security & Privacy (The Masker)
 

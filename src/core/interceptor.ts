@@ -17,6 +17,11 @@ export interface Logger {
 export interface HealEvent {
 	rule: HealingRule;
 	source: "llm" | "cache";
+	/**
+	 * Present and `true` only in dry-run mode, where the rule was computed and
+	 * reported but the healed retry was deliberately not sent. Absent otherwise.
+	 */
+	dryRun?: true;
 }
 
 export interface HealerConfig {
@@ -38,6 +43,14 @@ export interface HealerConfig {
 	 * effects (e.g. partial writes) even on a rejected non-idempotent request.
 	 */
 	allowUnsafeRetry?: boolean;
+	/**
+	 * Audit mode. When true, a failing request is still analyzed - the rule is
+	 * fetched from the store/LLM, validated, cached, and reported via `onHeal`
+	 * ({ dryRun: true }) - but the healed retry is never sent; the original
+	 * response is returned unchanged. Lets you see what healing WOULD do in
+	 * production before letting it mutate live traffic. Default false.
+	 */
+	dryRun?: boolean;
 	/** Attempts for provider.heal() on failure (network/timeout). Default 2. */
 	healRetries?: number;
 	/** Base delay in ms for exponential backoff between heal attempts. Default 250. */
@@ -214,6 +227,7 @@ export function createHealedFetch(
 	const maxErrorDetailsChars = config.maxErrorDetailsChars ?? 4000;
 	const healableStatuses = config.healableStatuses ?? DEFAULT_HEALABLE_STATUSES;
 	const allowUnsafeRetry = config.allowUnsafeRetry ?? true;
+	const dryRun = config.dryRun ?? false;
 	const healRetries = config.healRetries ?? 2;
 	const healRetryBaseMs = config.healRetryBaseMs ?? 250;
 	const logger = config.logger ?? console;
@@ -342,12 +356,27 @@ export function createHealedFetch(
 						storeError,
 					);
 				}
-				onHeal?.({ rule: healingRule, source: "llm" });
+				onHeal?.({
+					rule: healingRule,
+					source: "llm",
+					...(dryRun ? { dryRun: true } : {}),
+				});
 			} else {
 				logger.log(
 					"[ai-fetch-healer] Cache hit! Applying healing rule locally.",
 				);
-				onHeal?.({ rule: healingRule, source: "cache" });
+				onHeal?.({
+					rule: healingRule,
+					source: "cache",
+					...(dryRun ? { dryRun: true } : {}),
+				});
+			}
+
+			if (dryRun) {
+				logger.log(
+					"[ai-fetch-healer] Dry-run: healing rule computed and reported, retry not sent.",
+				);
+				return ensureReadableResponse(response);
 			}
 
 			if (

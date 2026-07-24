@@ -691,6 +691,76 @@ describe("createHealedFetch", () => {
 		expect(result.status).toBe(200);
 	});
 
+	it("dry-run reports the rule via onHeal but never sends the healed retry", async () => {
+		const rule = { action: "MAP_FIELDS", mapping: { name: "full_name" } };
+		const heal = vi.fn().mockResolvedValue({ healedPayload: {}, rule });
+		const provider: ILLMProvider = { name: "MockProvider", heal };
+
+		const fetchMock = vi.fn().mockResolvedValueOnce(
+			new Response("invalid payload", {
+				status: 400,
+				statusText: "Bad Request",
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+
+		const onHeal = vi.fn();
+		const cache = new HeuristicCache();
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+			cache,
+			dryRun: true,
+			onHeal,
+		});
+
+		const result = await healedFetch("https://api.example.com/users", {
+			method: "POST",
+			body: JSON.stringify({ name: "Alice" }),
+		});
+
+		// Analyzed once, but only the original send happened - no retry.
+		expect(heal).toHaveBeenCalledTimes(1);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(result.status).toBe(400);
+		expect(onHeal).toHaveBeenCalledWith({ rule, source: "llm", dryRun: true });
+	});
+
+	it("omits the dryRun flag from onHeal when dry-run is off", async () => {
+		const rule = { action: "MAP_FIELDS", mapping: { name: "full_name" } };
+		const heal = vi.fn().mockResolvedValue({ healedPayload: {}, rule });
+		const provider: ILLMProvider = { name: "MockProvider", heal };
+
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(
+			new Response("invalid payload", {
+				status: 400,
+				statusText: "Bad Request",
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response('{"ok":true}', {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+
+		const onHeal = vi.fn();
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+			cache: new HeuristicCache(),
+			onHeal,
+		});
+
+		await healedFetch("https://api.example.com/users", {
+			method: "POST",
+			body: JSON.stringify({ name: "Alice" }),
+		});
+
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(onHeal).toHaveBeenCalledWith({ rule, source: "llm" });
+	});
+
 	it("prefers store over cache when both are configured", async () => {
 		const rule = { action: "MAP_FIELDS", mapping: { name: "full_name" } };
 		const heal = vi.fn().mockResolvedValue({ healedPayload: {}, rule });
