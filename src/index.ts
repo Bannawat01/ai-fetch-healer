@@ -11,6 +11,11 @@ export {
 	createHealedFetchFromEnv,
 	createProviderFromEnv,
 } from "./core/from-env";
+export type {
+	InstallGlobalHealingOptions,
+	UninstallGlobalHealing,
+} from "./core/install-global";
+export { installGlobalHealing } from "./core/install-global";
 export type { HealEvent, HealerConfig, Logger } from "./core/interceptor";
 export { createHealedFetch } from "./core/interceptor";
 export { GeminiProvider } from "./llm/gemini";

@@ -36,6 +36,7 @@ await healedFetch('https://api.example.com/users', {
 - [Why It Matters](#why-it-matters)
 - [How It Works](#how-it-works)
 - [Quick Start](#quick-start)
+- [Zero-Config Global Install](#zero-config-global-install)
 - [Supported Providers](#supported-providers)
 - [Framework Adapters](#framework-adapters)
 - [Configuration](#configuration)
@@ -122,6 +123,28 @@ const healedFetch = createHealedFetch(new OpenRouterProvider());
 ```
 
 Create `healedFetch` **once** per provider (module scope, not per-request) - a fresh instance every call defeats the built-in rule cache and forces an LLM round-trip on every single request. Building an Express or Next.js route around it? See [Framework Adapters](#framework-adapters) below.
+
+## Zero-Config Global Install
+
+Want every `fetch` in your process healed without touching a single call site? Install healing onto the global `fetch` once, at startup:
+
+```ts
+import { installGlobalHealing } from 'ai-fetch-healer';
+
+const uninstall = installGlobalHealing(); // reads whichever provider key is set
+
+// From here on, every plain `fetch(...)` in the process is self-healing.
+await fetch('https://api.example.com/data', { method: 'POST', body: '...' });
+
+uninstall(); // restore the original global fetch
+```
+
+This is **opt-in and explicit** - importing the package never patches anything on its own, since replacing the global `fetch` is a process-wide side effect. Notes:
+
+- Always call the returned `uninstall()` in tests and hot-reload paths to restore the original `fetch`.
+- Calling `installGlobalHealing()` twice without uninstalling is a safe no-op - it never stacks wrappers (which would double every request).
+- Accepts the same options as [`createHealedFetch`](#configuration), plus an optional `provider` to skip env auto-detection: `installGlobalHealing({ provider: new OpenRouterProvider() })`.
+- Prefer an explicit `healedFetch` you pass around (`createHealedFetchFromEnv()`) when you can - global patching is the escape hatch for code you don't control the fetch calls of, not the default.
 
 ## Supported Providers
 
