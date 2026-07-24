@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { HeuristicCache } from "../../src/core/cache";
 import { createHealedFetch } from "../../src/core/interceptor";
 import type { RuleStore } from "../../src/core/store";
+import { HeuristicHealer } from "../../src/llm/heuristic";
 import type { HealingRule, ILLMProvider } from "../../src/types";
 
 describe("createHealedFetch", () => {
@@ -759,6 +760,38 @@ describe("createHealedFetch", () => {
 
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 		expect(onHeal).toHaveBeenCalledWith({ rule, source: "llm" });
+	});
+
+	it("heals a casing mismatch end-to-end with HeuristicHealer and no LLM key", async () => {
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(
+			new Response('{"error":"field \\"full_name\\" is required"}', {
+				status: 422,
+				statusText: "Unprocessable Entity",
+				headers: { "content-type": "application/json" },
+			}),
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response('{"ok":true}', {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+
+		const healedFetch = createHealedFetch(new HeuristicHealer(), {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+			cache: new HeuristicCache(),
+		});
+
+		await healedFetch("https://api.example.com/users", {
+			method: "POST",
+			body: JSON.stringify({ fullName: "Alice", age: 30 }),
+		});
+
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		const secondInit = fetchMock.mock.calls[1][1] as RequestInit;
+		const healedBody = JSON.parse(String(secondInit.body));
+		expect(healedBody).toEqual({ full_name: "Alice", age: 30 });
 	});
 
 	it("prefers store over cache when both are configured", async () => {

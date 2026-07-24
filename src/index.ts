@@ -22,9 +22,11 @@ export type { RuleStore } from "./core/store";
 export { generateRuleKey } from "./core/store";
 export type { AnthropicProviderOptions } from "./llm/anthropic";
 export { AnthropicProvider } from "./llm/anthropic";
+export { FallbackProvider } from "./llm/fallback";
 export { GeminiProvider } from "./llm/gemini";
 export type { GroqProviderOptions } from "./llm/groq";
 export { GroqProvider } from "./llm/groq";
+export { HeuristicHealer } from "./llm/heuristic";
 export type { ProviderKey } from "./llm/models";
 export {
 	DEFAULT_MODELS,

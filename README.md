@@ -187,8 +187,41 @@ This is **opt-in and explicit** - importing the package never patches anything o
 | `GeminiProvider` | Google Gemini | Direct Gemini API |
 | `GroqProvider` | [Groq](https://groq.com) | Fast inference, OpenAI-compatible |
 | `OllamaProvider` | [Ollama](https://ollama.com) | Local/self-hosted, no API key needed by default |
+| `HeuristicHealer` | none | **No LLM, no key, no cost.** Fixes field-casing mismatches (`fullName` ↔ `full_name`) with pure logic - see below |
+| `FallbackProvider` | wraps others | Tries providers in order; first success wins - put `HeuristicHealer` first, an LLM second |
 
-All providers throw a typed `Error` synchronously in the constructor if no API key can be resolved (except `OllamaProvider`, which doesn't require one for a default local install).
+All LLM providers throw a typed `Error` synchronously in the constructor if no API key can be resolved (except `OllamaProvider`, which doesn't require one for a default local install). `HeuristicHealer` needs no key at all.
+
+### No-LLM healing (free, instant)
+
+The single most common REST schema mismatch is a field spelled with the wrong casing - `fullName` where the API wanted `full_name`, `userId` vs `user_id`. That needs no AI to fix. `HeuristicHealer` reads the field names the API names in its error, matches them against your payload keys (ignoring case and separators), and emits the rename - **zero key, zero cost, zero latency, fully deterministic**:
+
+```ts
+import { createHealedFetch, HeuristicHealer } from 'ai-fetch-healer';
+
+// No API key anywhere. Heals casing mismatches for free.
+const healedFetch = createHealedFetch(new HeuristicHealer());
+```
+
+Pair it with an LLM via `FallbackProvider` to get the best of both: common cases are fixed for free, and only the genuinely hard failures fall through to the (paid) model:
+
+```ts
+import {
+  createHealedFetch,
+  FallbackProvider,
+  HeuristicHealer,
+  OpenRouterProvider,
+} from 'ai-fetch-healer';
+
+const healedFetch = createHealedFetch(
+  new FallbackProvider([
+    new HeuristicHealer(),    // free: casing renames
+    new OpenRouterProvider(), // paid: everything else
+  ]),
+);
+```
+
+`HeuristicHealer` intentionally does one thing well; when it finds no confident rename it defers (throws), so the fallback chain moves on and, used alone, the interceptor fails open to the original response.
 
 ### API key resolution
 
