@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.1.0...v1.2.0) (2026-07-24)
+
+
+### Features
+
+* model fallback chains + env-var overrides across all providers ([d738cd0](https://github.com/Bannawat01/ai-fetch-healer/commit/d738cd06e9d2588ba86a94687eb237fd674818e3))
+
 # [1.1.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.0.2...v1.1.0) (2026-07-20)
 
 
