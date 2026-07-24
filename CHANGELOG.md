@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.10.0...v1.11.0) (2026-07-24)
+
+
+### Features
+
+* HeuristicHealer (no-LLM healing) + FallbackProvider ([8622a8c](https://github.com/Bannawat01/ai-fetch-healer/commit/8622a8c7df0b4beb0bb3676f443dacea22f4dd04))
+
 # [1.10.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.9.0...v1.10.0) (2026-07-24)
 
 
