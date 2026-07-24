@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.8.0...v1.9.0) (2026-07-24)
+
+
+### Features
+
+* dry-run / audit mode for safe healing rollout ([0a8dffa](https://github.com/Bannawat01/ai-fetch-healer/commit/0a8dffaf400c8e2a1a736d87f35112b331476eaa))
+
 # [1.8.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.7.0...v1.8.0) (2026-07-24)
 
 
