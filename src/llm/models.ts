@@ -9,7 +9,13 @@
  */
 
 /** Known provider keys used to look up default model chains. */
-export type ProviderKey = "openrouter" | "gemini" | "groq" | "ollama";
+export type ProviderKey =
+	| "openrouter"
+	| "openai"
+	| "anthropic"
+	| "gemini"
+	| "groq"
+	| "ollama";
 
 /**
  * Default model chain per provider. The first entry is the primary; later
@@ -18,6 +24,8 @@ export type ProviderKey = "openrouter" | "gemini" | "groq" | "ollama";
  */
 export const DEFAULT_MODELS = {
 	openrouter: ["openai/gpt-4o-mini"],
+	openai: ["gpt-4o-mini"],
+	anthropic: ["claude-3-5-haiku-latest"],
 	gemini: ["gemini-2.5-flash"],
 	groq: ["llama-3.3-70b-versatile"],
 	ollama: ["llama3.1"],

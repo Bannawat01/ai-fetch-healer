@@ -20,6 +20,8 @@ export type { HealEvent, HealerConfig, Logger } from "./core/interceptor";
 export { createHealedFetch } from "./core/interceptor";
 export type { RuleStore } from "./core/store";
 export { generateRuleKey } from "./core/store";
+export type { AnthropicProviderOptions } from "./llm/anthropic";
+export { AnthropicProvider } from "./llm/anthropic";
 export { GeminiProvider } from "./llm/gemini";
 export type { GroqProviderOptions } from "./llm/groq";
 export { GroqProvider } from "./llm/groq";
@@ -31,6 +33,8 @@ export {
 } from "./llm/models";
 export type { OllamaProviderOptions } from "./llm/ollama";
 export { OllamaProvider } from "./llm/ollama";
+export type { OpenAIProviderOptions } from "./llm/openai";
+export { OpenAIProvider } from "./llm/openai";
 export type { OpenRouterProviderOptions } from "./llm/openrouter";
 export { OpenRouterProvider } from "./llm/openrouter";
 export type { MaskerOptions, PayloadMasker } from "./security/masker";

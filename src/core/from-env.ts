@@ -1,6 +1,8 @@
+import { AnthropicProvider } from "../llm/anthropic";
 import { GeminiProvider } from "../llm/gemini";
 import { GroqProvider } from "../llm/groq";
 import { OllamaProvider } from "../llm/ollama";
+import { OpenAIProvider } from "../llm/openai";
 import { OpenRouterProvider } from "../llm/openrouter";
 import type { ILLMProvider } from "../types";
 import { createHealedFetch, type HealerConfig } from "./interceptor";
@@ -13,8 +15,8 @@ function readEnv(): Record<string, string | undefined> | undefined {
 
 /**
  * Picks the first LLM provider whose credentials are present in the
- * environment, in priority order: OpenRouter -> Groq -> Gemini (direct) ->
- * Ollama. Ollama is checked last and only via an explicit signal
+ * environment, in priority order: OpenRouter -> OpenAI -> Anthropic -> Groq ->
+ * Gemini (direct) -> Ollama. Ollama is checked last and only via an explicit signal
  * (AI_HEALER_OLLAMA_URL/KEY) - it needs no API key, so without that guard
  * every environment with zero keys set would silently try (and fail against)
  * a local server that may not exist.
@@ -27,6 +29,12 @@ export function createProviderFromEnv(): ILLMProvider {
 
 	if (env?.AI_HEALER_OPENROUTER_KEY || env?.OPENROUTER_API_KEY) {
 		return new OpenRouterProvider();
+	}
+	if (env?.AI_HEALER_OPENAI_KEY || env?.OPENAI_API_KEY) {
+		return new OpenAIProvider();
+	}
+	if (env?.AI_HEALER_ANTHROPIC_KEY || env?.ANTHROPIC_API_KEY) {
+		return new AnthropicProvider();
 	}
 	if (env?.AI_HEALER_GROQ_KEY || env?.GROQ_API_KEY) {
 		return new GroqProvider();
@@ -44,7 +52,8 @@ export function createProviderFromEnv(): ILLMProvider {
 
 	throw new Error(
 		"[ai-fetch-healer] No LLM provider credentials found in the environment. " +
-			"Set one of: AI_HEALER_OPENROUTER_KEY, AI_HEALER_GROQ_KEY, GEMINI_API_KEY, " +
+			"Set one of: AI_HEALER_OPENROUTER_KEY, AI_HEALER_OPENAI_KEY, " +
+			"AI_HEALER_ANTHROPIC_KEY, AI_HEALER_GROQ_KEY, GEMINI_API_KEY, " +
 			"or AI_HEALER_OLLAMA_URL (for a local Ollama server). " +
 			"See https://github.com/Bannawat01/ai-fetch-healer#quick-start.",
 	);

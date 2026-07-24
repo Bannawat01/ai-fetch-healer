@@ -28,6 +28,25 @@ describe("createProviderFromEnv", () => {
 		expect(createProviderFromEnv().name).toBe("OpenRouter");
 	});
 
+	it("picks OpenAIProvider when only an OpenAI key is set", () => {
+		vi.stubEnv("OPENAI_API_KEY", "oa-key");
+
+		expect(createProviderFromEnv().name).toBe("OpenAI");
+	});
+
+	it("picks AnthropicProvider when only an Anthropic key is set", () => {
+		vi.stubEnv("ANTHROPIC_API_KEY", "an-key");
+
+		expect(createProviderFromEnv().name).toBe("Anthropic (Claude)");
+	});
+
+	it("prefers OpenAI over Anthropic when both keys are present", () => {
+		vi.stubEnv("OPENAI_API_KEY", "oa-key");
+		vi.stubEnv("ANTHROPIC_API_KEY", "an-key");
+
+		expect(createProviderFromEnv().name).toBe("OpenAI");
+	});
+
 	it("picks GroqProvider when only a Groq key is set", () => {
 		vi.stubEnv("AI_HEALER_GROQ_KEY", "groq-key");
 

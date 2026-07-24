@@ -152,6 +152,8 @@ This is **opt-in and explicit** - importing the package never patches anything o
 | Provider | Backend | Notes |
 | --- | --- | --- |
 | `OpenRouterProvider` | [OpenRouter](https://openrouter.ai) | Multi-model gateway, default `openai/gpt-4o-mini` |
+| `OpenAIProvider` | [OpenAI](https://platform.openai.com) | Direct OpenAI API, default `gpt-4o-mini`; accepts a custom `baseUrl` for OpenAI-compatible gateways |
+| `AnthropicProvider` | [Anthropic](https://www.anthropic.com) | Claude via the Messages API, default `claude-3-5-haiku-latest` |
 | `GeminiProvider` | Google Gemini | Direct Gemini API |
 | `GroqProvider` | [Groq](https://groq.com) | Fast inference, OpenAI-compatible |
 | `OllamaProvider` | [Ollama](https://ollama.com) | Local/self-hosted, no API key needed by default |
@@ -183,7 +185,7 @@ const withKeyAndOptions = new OpenRouterProvider('YOUR_KEY', {
 });
 ```
 
-`GroqProvider` follows the same pattern (`AI_HEALER_GROQ_KEY` / `GROQ_API_KEY`). `OllamaProvider` additionally accepts a configurable `baseUrl` and `model`, since there's no universal default that matches what you've pulled locally:
+`OpenAIProvider` (`AI_HEALER_OPENAI_KEY` / `OPENAI_API_KEY`), `AnthropicProvider` (`AI_HEALER_ANTHROPIC_KEY` / `ANTHROPIC_API_KEY`), and `GroqProvider` (`AI_HEALER_GROQ_KEY` / `GROQ_API_KEY`) all follow the same pattern. `OllamaProvider` additionally accepts a configurable `baseUrl` and `model`, since there's no universal default that matches what you've pulled locally:
 
 ```ts
 import { OllamaProvider } from 'ai-fetch-healer';
