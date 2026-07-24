@@ -307,6 +307,8 @@ const cache = new HeuristicCache({ maxEntries: 500, ttlMs: 1000 * 60 * 60 }); //
 const healedFetch = createHealedFetch(provider, { cache });
 ```
 
+The `Masker` and `HeuristicCache` code paths run on every healable-status response - including cache hits, since masking has to happen before a cache key can even be generated - so both are kept allocation-light. Run `pnpm bench` to benchmark them on your own machine (`benchmarks/`, via vitest's built-in bench runner); numbers aren't published here since they're hardware-dependent and this repo doesn't want to make a claim it can't keep current. What actually dominates request latency in practice is the upstream API + LLM provider round-trip, not this library's own overhead.
+
 ## Examples
 
 The [`examples/`](./examples) directory has standalone snippets for real integration paths: a minimal Node script, an Express proxy route, a Next.js App Router handler, and the observability wiring shown above.

@@ -37,6 +37,7 @@
 		"dev": "tsup --watch",
 		"test": "vitest",
 		"test:run": "vitest run",
+		"bench": "vitest bench --run",
 		"lint": "biome check .",
 		"format": "biome format --write .",
 		"release": "semantic-release"

@@ -31,11 +31,11 @@ Breaking changes: add `BREAKING CHANGE:` in the commit body (triggers a major bu
 
 New providers (Groq, Ollama, OpenRouter) share an OpenAI-compatible chat-completions shape via `OpenAICompatProvider` (`src/llm/openai-compat.ts`). If the backend you're adding speaks that same API:
 
-1. `src/llm/<name>.ts` - extend `OpenAICompatProvider`, set `name`, `baseUrl`, `model`. See `src/llm/groq.ts` for the smallest example.
+1. `src/llm/<name>.ts` - extend `OpenAICompatProvider`, set `name`, `baseUrl`, and `models: string[]` (an ordered fallback chain, not a single `model` string - resolve it via `resolveModelChain()` from `src/llm/models.ts`, and add your registry default to `DEFAULT_MODELS`). See `src/llm/groq.ts` for the smallest example.
 2. Resolve the API key from constructor args first, then provider-specific env vars (`AI_HEALER_<NAME>_KEY` before the provider's own conventional var name).
 3. Export the class and its options type from `src/index.ts`.
-4. Add `tests/llm/<name>.test.ts` - cover: missing-key throws, successful heal parses the rule, non-JSON/failed response wraps into a labeled error. See `tests/llm/groq.test.ts`.
-5. Add the provider to the "Supported Providers" list in `README.md`.
+4. Add `tests/llm/<name>.test.ts` - cover: missing-key throws, successful heal parses the rule, non-JSON/failed response wraps into a labeled error, model-unavailable falls through to the next in the chain. See `tests/llm/groq.test.ts`.
+5. Add the provider to the "Supported Providers" table in `README.md`.
 
 If the backend doesn't speak OpenAI-compat (a different request/response shape entirely), extend `BaseLLMProvider` (`src/llm/provider.ts`) directly instead - see `src/llm/gemini.ts`.
 
@@ -50,3 +50,7 @@ These aren't style preferences - breaking them is a correctness or security bug.
 
 - Framework: vitest. Mock `fetch` and the provider with `vi.fn()` - no real network calls in tests.
 - Every new module ships with a test file in the same PR.
+
+## Benchmarks
+
+`pnpm bench` runs `benchmarks/*.bench.ts` (vitest's built-in bench runner, no extra deps). Add one when you touch a hot path - `Masker` and `HeuristicCache` run on every healable-status response, not just the LLM-miss path, so regressions there are easy to introduce without noticing.
