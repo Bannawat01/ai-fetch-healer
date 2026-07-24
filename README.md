@@ -18,9 +18,10 @@
 `ai-fetch-healer` is a zero-dependency `fetch` wrapper that catches schema-mismatch failures (400/422), asks an LLM for a one-line fix, applies it, and retries - automatically. Field renamed upstream? Type changed from string to number? A newly-required field? It heals the request instead of paging you.
 
 ```ts
-import { createHealedFetch, OpenRouterProvider } from 'ai-fetch-healer';
+import { createHealedFetchFromEnv } from 'ai-fetch-healer';
 
-const healedFetch = createHealedFetch(new OpenRouterProvider());
+// Reads whichever provider key you've set (OpenRouter/Groq/Gemini/Ollama) - no provider import needed.
+const healedFetch = createHealedFetchFromEnv();
 
 // Upstream now expects `full_name`, not `user_name` - this still works.
 await healedFetch('https://api.example.com/users', {
@@ -93,16 +94,29 @@ A healing rule is one of three actions, chosen by the LLM from the error and the
 pnpm add ai-fetch-healer
 ```
 
-```ts
-import { createHealedFetch, OpenRouterProvider } from 'ai-fetch-healer';
+Set **any one** provider key and go - no provider class to pick or import:
 
-const provider = new OpenRouterProvider(); // reads AI_HEALER_OPENROUTER_KEY from env
-const healedFetch = createHealedFetch(provider);
+```env
+AI_HEALER_OPENROUTER_KEY=your_key_here
+```
+
+```ts
+import { createHealedFetchFromEnv } from 'ai-fetch-healer';
+
+const healedFetch = createHealedFetchFromEnv();
 
 const response = await healedFetch('https://api.example.com/data', {
   method: 'POST',
   body: JSON.stringify({ user_name: 'Code' }),
 });
+```
+
+`createHealedFetchFromEnv()` auto-detects your provider from whichever env var is set (priority: OpenRouter → Groq → Gemini → Ollama) and throws an actionable error at startup - listing exactly which env vars it checked - if none are found. Prefer picking the provider explicitly? Use `createHealedFetch(provider)` instead:
+
+```ts
+import { createHealedFetch, OpenRouterProvider } from 'ai-fetch-healer';
+
+const healedFetch = createHealedFetch(new OpenRouterProvider());
 ```
 
 Create `healedFetch` **once** per provider (module scope, not per-request) - a fresh instance every call defeats the built-in rule cache and forces an LLM round-trip on every single request. See [`examples/`](./examples) for Express and Next.js integrations.

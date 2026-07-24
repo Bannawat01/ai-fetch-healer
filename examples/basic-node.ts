@@ -1,8 +1,10 @@
-import { createHealedFetch, OpenRouterProvider } from "ai-fetch-healer";
+import { createHealedFetchFromEnv } from "ai-fetch-healer";
 
-// Reads AI_HEALER_OPENROUTER_KEY / OPENROUTER_API_KEY from process.env.
-const provider = new OpenRouterProvider();
-const healedFetch = createHealedFetch(provider);
+// Auto-detects your provider from whichever key is set (OpenRouter/Groq/
+// Gemini/Ollama) - no provider import needed. Want to pick one explicitly
+// instead? `import { createHealedFetch, OpenRouterProvider } from "ai-fetch-healer"`
+// and call `createHealedFetch(new OpenRouterProvider())`.
+const healedFetch = createHealedFetchFromEnv();
 
 async function main() {
 	const response = await healedFetch("https://api.example.com/users", {

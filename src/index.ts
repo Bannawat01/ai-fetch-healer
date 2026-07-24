@@ -1,4 +1,8 @@
 export { HeuristicCache, type HeuristicCacheOptions } from "./core/cache";
+export {
+	createHealedFetchFromEnv,
+	createProviderFromEnv,
+} from "./core/from-env";
 export type { HealEvent, HealerConfig, Logger } from "./core/interceptor";
 export { createHealedFetch } from "./core/interceptor";
 export { GeminiProvider } from "./llm/gemini";
