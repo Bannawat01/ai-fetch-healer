@@ -9,6 +9,7 @@
   <a href="https://www.npmjs.com/package/ai-fetch-healer"><img alt="npm downloads" src="https://img.shields.io/npm/dm/ai-fetch-healer.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
   <a href="https://github.com/Bannawat01/ai-fetch-healer/actions/workflows/ci.yml"><img alt="Build Status" src="https://github.com/Bannawat01/ai-fetch-healer/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://codecov.io/gh/Bannawat01/ai-fetch-healer"><img alt="Coverage" src="https://codecov.io/gh/Bannawat01/ai-fetch-healer/branch/main/graph/badge.svg"></a>
   <img alt="Zero runtime dependencies" src="https://img.shields.io/badge/dependencies-0-brightgreen.svg">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-blue.svg">
 </p>

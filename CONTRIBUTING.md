@@ -50,6 +50,7 @@ These aren't style preferences - breaking them is a correctness or security bug.
 
 - Framework: vitest. Mock `fetch` and the provider with `vi.fn()` - no real network calls in tests.
 - Every new module ships with a test file in the same PR.
+- `pnpm test:coverage` runs the suite with v8 coverage instrumentation (see the badge in `README.md`). Not part of the required pre-PR gate - CI uploads it to Codecov as an informational signal, not a blocking check.
 
 ## Benchmarks
 
