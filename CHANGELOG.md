@@ -1,3 +1,11 @@
+# [1.4.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.3.1...v1.4.0) (2026-07-24)
+
+
+### Features
+
+* add benchmarks for Masker and HeuristicCache hot paths ([41dca67](https://github.com/Bannawat01/ai-fetch-healer/commit/41dca6703a71f57474a950296e2e44498b100962))
+* framework adapters for Express and Web-standard runtimes ([7016280](https://github.com/Bannawat01/ai-fetch-healer/commit/701628034372cbe26231cf07ca87874905231734))
+
 ## [1.3.1](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.3.0...v1.3.1) (2026-07-24)
 
 
