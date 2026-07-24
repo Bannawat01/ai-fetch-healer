@@ -40,6 +40,7 @@ await healedFetch('https://api.example.com/users', {
 - [Supported Providers](#supported-providers)
 - [Framework Adapters](#framework-adapters)
 - [Configuration](#configuration)
+- [Persistent Rule Store](#persistent-rule-store)
 - [Observability](#observability)
 - [Security & Privacy (The Masker)](#security--privacy-the-masker)
 - [Resilience & Timeouts](#resilience--timeouts)
@@ -232,6 +233,7 @@ Neither adapter imports `next`/`express` - the Web adapter targets the standard 
 | --- | --- | --- |
 | `fetchFunction` | `globalThis.fetch` | Swap in a custom `fetch` implementation |
 | `cache` | shared `HeuristicCache` | Bring your own cache instance/config |
+| `store` | - | Persistent [rule store](#persistent-rule-store) (file, Redis, KV, ...). Takes precedence over `cache`. Store errors degrade to a cache miss - a broken store never breaks healing |
 | `masker` | shared `Masker` | Bring your own PII-masking rules |
 | `healableStatuses` | `[400, 422]` | Which response statuses trigger healing |
 | `allowUnsafeRetry` | `true` | Retry non-idempotent methods (`POST`/`PATCH`/...) with the healed payload. The original request already failed, so under normal conditions the retry is the only send that succeeds - set `false` only if your upstream API is known to apply partial writes even on rejected requests |
@@ -249,6 +251,38 @@ const healedFetch = createHealedFetch(provider, {
   allowUnsafeRetry: false,
 });
 ```
+
+## Persistent Rule Store
+
+By default, healed rules live in an in-memory LRU cache - a restart or redeploy forgets everything and the next failing request pays the LLM round-trip again. Plug in a `RuleStore` to persist rules across restarts:
+
+```ts
+import { createHealedFetch, FileRuleStore, OpenRouterProvider } from 'ai-fetch-healer';
+
+const healedFetch = createHealedFetch(new OpenRouterProvider(), {
+  store: new FileRuleStore({ filePath: './.ai-fetch-healer-rules.json', ttlMs: 7 * 24 * 60 * 60 * 1000 }),
+});
+```
+
+`FileRuleStore` (Node only) persists rules to a JSON file with atomic writes; a missing or corrupt file starts empty instead of throwing. Rules learned once keep working after every deploy.
+
+Backing it with Redis, a database, or an edge KV takes ~10 lines - `RuleStore` is just async `get`/`set`:
+
+```ts
+import type { RuleStore } from 'ai-fetch-healer';
+
+const redisStore: RuleStore = {
+  get: async (key) => {
+    const raw = await redis.get(`heal:${key}`);
+    return raw ? JSON.parse(raw) : null;
+  },
+  set: async (key, rule) => {
+    await redis.set(`heal:${key}`, JSON.stringify(rule), { EX: 60 * 60 * 24 * 7 });
+  },
+};
+```
+
+Only rule *shapes* are stored (keyed by method + URL + masked payload schema) - never raw payload values, so the store contains no PII by construction.
 
 ## Observability
 

@@ -7,6 +7,7 @@ import type {
 	JsonValue,
 } from "../types";
 import { HeuristicCache } from "./cache";
+import { generateRuleKey, type RuleStore } from "./store";
 
 export interface Logger {
 	log(...args: unknown[]): void;
@@ -21,6 +22,12 @@ export interface HealEvent {
 export interface HealerConfig {
 	fetchFunction?: typeof fetch;
 	cache?: HeuristicCache;
+	/**
+	 * Persistent rule store (file, Redis, KV, ...). Takes precedence over
+	 * `cache` when both are set. Store errors degrade to a cache miss and
+	 * never break healing.
+	 */
+	store?: RuleStore;
 	masker?: PayloadMasker;
 	maxErrorDetailsChars?: number;
 	healableStatuses?: number[];
@@ -202,7 +209,7 @@ export function createHealedFetch(
 	config: HealerConfig = {},
 ) {
 	const baseFetch = config.fetchFunction || globalThis.fetch;
-	const cache = config.cache || globalCache;
+	const store: RuleStore = config.store ?? config.cache ?? globalCache;
 	const masker = config.masker || globalMasker;
 	const maxErrorDetailsChars = config.maxErrorDetailsChars ?? 4000;
 	const healableStatuses = config.healableStatuses ?? DEFAULT_HEALABLE_STATUSES;
@@ -285,9 +292,17 @@ export function createHealedFetch(
 					: input instanceof URL
 						? input.toString()
 						: input.url;
-			const cacheKey = cache.generateKey(method, urlStr, maskedSchema);
+			const cacheKey = generateRuleKey(method, urlStr, maskedSchema);
 
-			let healingRule = cache.get(cacheKey);
+			let healingRule: HealingRule | null = null;
+			try {
+				healingRule = (await store.get(cacheKey)) ?? null;
+			} catch (storeError) {
+				logger.warn(
+					"[ai-fetch-healer] Rule store get() failed, treating as cache miss.",
+					storeError,
+				);
+			}
 
 			if (!healingRule) {
 				logger.log(
@@ -319,7 +334,14 @@ export function createHealedFetch(
 					return ensureReadableResponse(response);
 				}
 
-				cache.set(cacheKey, healingRule);
+				try {
+					await store.set(cacheKey, healingRule);
+				} catch (storeError) {
+					logger.warn(
+						"[ai-fetch-healer] Rule store set() failed, rule not persisted.",
+						storeError,
+					);
+				}
 				onHeal?.({ rule: healingRule, source: "llm" });
 			} else {
 				logger.log(

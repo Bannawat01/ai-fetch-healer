@@ -1,4 +1,5 @@
 import type { HealingRule, JsonValue } from "../types";
+import { generateRuleKey, type RuleStore } from "./store";
 
 interface CacheEntry {
 	rule: HealingRule;
@@ -17,7 +18,7 @@ export interface HeuristicCacheOptions {
  * `get()` bumps an entry's recency; eviction at capacity removes the entry
  * that has gone longest without a `get()` hit, not the oldest-inserted one.
  */
-export class HeuristicCache {
+export class HeuristicCache implements RuleStore {
 	private cache: Map<string, CacheEntry>;
 	private readonly maxEntries: number;
 	private readonly ttlMs: number | null;
@@ -40,9 +41,7 @@ export class HeuristicCache {
 	}
 
 	generateKey(method: string, url: string, maskedPayload: JsonValue): string {
-		const payloadSignature = JSON.stringify(maskedPayload);
-
-		return `${method.toUpperCase()}:${url}:${payloadSignature}`;
+		return generateRuleKey(method, url, maskedPayload);
 	}
 
 	set(key: string, rule: HealingRule): void {

@@ -18,6 +18,8 @@ export type {
 export { installGlobalHealing } from "./core/install-global";
 export type { HealEvent, HealerConfig, Logger } from "./core/interceptor";
 export { createHealedFetch } from "./core/interceptor";
+export type { RuleStore } from "./core/store";
+export { generateRuleKey } from "./core/store";
 export { GeminiProvider } from "./llm/gemini";
 export type { GroqProviderOptions } from "./llm/groq";
 export { GroqProvider } from "./llm/groq";
@@ -33,6 +35,8 @@ export type { OpenRouterProviderOptions } from "./llm/openrouter";
 export { OpenRouterProvider } from "./llm/openrouter";
 export type { MaskerOptions, PayloadMasker } from "./security/masker";
 export { Masker, maskPayload } from "./security/masker";
+export type { FileRuleStoreOptions } from "./stores/file";
+export { FileRuleStore } from "./stores/file";
 export type {
 	HealingRule,
 	ILLMProvider,

@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { HeuristicCache } from "../../src/core/cache";
 import { createHealedFetch } from "../../src/core/interceptor";
-import type { ILLMProvider } from "../../src/types";
+import type { RuleStore } from "../../src/core/store";
+import type { HealingRule, ILLMProvider } from "../../src/types";
 
 describe("createHealedFetch", () => {
 	it("applies CHANGE_TYPE conversions from AI healing rule", async () => {
@@ -603,5 +604,131 @@ describe("createHealedFetch", () => {
 		expect(result.status).toBe(422);
 		expect(onHealFail).toHaveBeenCalledTimes(1);
 		expect(onHealFail).toHaveBeenCalledWith(expect.any(Error));
+	});
+
+	it("uses an async RuleStore: miss consults the LLM, hit skips it", async () => {
+		const rule = { action: "MAP_FIELDS", mapping: { name: "full_name" } };
+		const heal = vi.fn().mockResolvedValue({ healedPayload: {}, rule });
+		const provider: ILLMProvider = { name: "MockProvider", heal };
+
+		const backing = new Map<string, HealingRule>();
+		const store: RuleStore = {
+			get: async (key) => backing.get(key) ?? null,
+			set: async (key, value) => {
+				backing.set(key, value);
+			},
+		};
+
+		const fetchMock = vi.fn().mockResolvedValue(
+			new Response("invalid payload", {
+				status: 400,
+				statusText: "Bad Request",
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+			store,
+			allowUnsafeRetry: false,
+		});
+
+		await healedFetch("https://api.example.com/users", {
+			method: "GET",
+			body: JSON.stringify({ name: "Alice" }),
+		});
+		await healedFetch("https://api.example.com/users", {
+			method: "GET",
+			body: JSON.stringify({ name: "Alice" }),
+		});
+
+		expect(heal).toHaveBeenCalledTimes(1);
+		expect(backing.size).toBe(1);
+	});
+
+	it("treats a throwing store.get() as a cache miss instead of aborting the heal", async () => {
+		const rule = { action: "MAP_FIELDS", mapping: { name: "full_name" } };
+		const heal = vi.fn().mockResolvedValue({ healedPayload: {}, rule });
+		const provider: ILLMProvider = { name: "MockProvider", heal };
+
+		const store: RuleStore = {
+			get: () => {
+				throw new Error("store backend down");
+			},
+			set: () => {
+				throw new Error("store backend down");
+			},
+		};
+
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(
+			new Response("invalid payload", {
+				status: 400,
+				statusText: "Bad Request",
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response('{"ok":true}', {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+			store,
+			logger: { log: vi.fn(), warn: vi.fn() },
+		});
+
+		const result = await healedFetch("https://api.example.com/users", {
+			method: "POST",
+			body: JSON.stringify({ name: "Alice" }),
+		});
+
+		expect(heal).toHaveBeenCalledTimes(1);
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(result.status).toBe(200);
+	});
+
+	it("prefers store over cache when both are configured", async () => {
+		const rule = { action: "MAP_FIELDS", mapping: { name: "full_name" } };
+		const heal = vi.fn().mockResolvedValue({ healedPayload: {}, rule });
+		const provider: ILLMProvider = { name: "MockProvider", heal };
+
+		const storeGet = vi.fn().mockResolvedValue(rule);
+		const store: RuleStore = { get: storeGet, set: vi.fn() };
+		const cache = new HeuristicCache();
+		const cacheGet = vi.spyOn(cache, "get");
+
+		const fetchMock = vi.fn();
+		fetchMock.mockResolvedValueOnce(
+			new Response("invalid payload", {
+				status: 400,
+				statusText: "Bad Request",
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response('{"ok":true}', {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+
+		const healedFetch = createHealedFetch(provider, {
+			fetchFunction: fetchMock as unknown as typeof fetch,
+			store,
+			cache,
+		});
+
+		await healedFetch("https://api.example.com/users", {
+			method: "POST",
+			body: JSON.stringify({ name: "Alice" }),
+		});
+
+		expect(storeGet).toHaveBeenCalledTimes(1);
+		expect(cacheGet).not.toHaveBeenCalled();
+		expect(heal).not.toHaveBeenCalled();
 	});
 });
