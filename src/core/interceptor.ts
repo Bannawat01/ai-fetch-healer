@@ -227,6 +227,11 @@ export function createHealedFetch(
 	const maxErrorDetailsChars = config.maxErrorDetailsChars ?? 4000;
 	const healableStatuses = config.healableStatuses ?? DEFAULT_HEALABLE_STATUSES;
 	const allowUnsafeRetry = config.allowUnsafeRetry ?? true;
+	// Whether the caller explicitly chose a value. When they didn't, they're
+	// riding the current `true` default, which is scheduled to flip to `false`
+	// in the next major - so we warn once (see the retry path below).
+	const allowUnsafeRetryExplicit = config.allowUnsafeRetry !== undefined;
+	let unsafeRetryDefaultWarned = false;
 	const dryRun = config.dryRun ?? false;
 	const healRetries = config.healRetries ?? 2;
 	const healRetryBaseMs = config.healRetryBaseMs ?? 250;
@@ -298,6 +303,19 @@ export function createHealedFetch(
 						"The original request failed validation (no side effect expected), but set " +
 						"allowUnsafeRetry: false if your upstream API may apply partial writes on rejected requests.",
 				);
+
+				// One-time deprecation notice: the default is changing, so callers
+				// riding it should pin their intent now. Warned once per instance
+				// to avoid flooding logs on every non-idempotent heal.
+				if (!allowUnsafeRetryExplicit && !unsafeRetryDefaultWarned) {
+					unsafeRetryDefaultWarned = true;
+					logger.warn(
+						"[ai-fetch-healer] Deprecation: allowUnsafeRetry defaults to true today, but will " +
+							`default to false in the next major version - healed retries of non-idempotent methods ("${method}") ` +
+							"will then be opt-in. Set allowUnsafeRetry explicitly (true to keep healing POST/PATCH, " +
+							"false to adopt the safer behavior now), and send an Idempotency-Key header when you keep it true.",
+					);
+				}
 			}
 
 			const urlStr =

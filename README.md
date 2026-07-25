@@ -351,7 +351,7 @@ Neither adapter imports `next`/`express` - the Web adapter targets the standard 
 | `masker` | shared `Masker` | Bring your own PII-masking rules |
 | `healableStatuses` | `[400, 422]` | Which response statuses trigger healing |
 | `dryRun` | `false` | Audit mode: analyze the failure and report the rule via `onHeal` (`{ dryRun: true }`), but never send the healed retry. See what healing *would* do in production before it touches live traffic |
-| `allowUnsafeRetry` | `true` | Retry non-idempotent methods (`POST`/`PATCH`/...) with the healed payload. The original request already failed, so under normal conditions the retry is the only send that succeeds - set `false` only if your upstream API is known to apply partial writes even on rejected requests |
+| `allowUnsafeRetry` | `true` (⚠️ changing) | Retry non-idempotent methods (`POST`/`PATCH`/...) with the healed payload. The original request already failed, so under normal conditions the retry is the only send that succeeds - set `false` only if your upstream API is known to apply partial writes even on rejected requests. **This default will flip to `false` in the next major version** (see note below) |
 | `healRetries` | `2` | Retry attempts for `provider.heal()` on network/timeout failure |
 | `healRetryBaseMs` | `250` | Base delay for exponential backoff between heal attempts |
 | `maxErrorDetailsChars` | `4000` | Truncates the error body sent to the LLM |
@@ -368,6 +368,8 @@ const healedFetch = createHealedFetch(provider, {
 ```
 
 > **Idempotency:** when `allowUnsafeRetry` is `true` (the default) and the upstream API supports it, send an `Idempotency-Key` header on `POST`/`PATCH` requests. A healed retry re-sends the request, so if the original had already applied a side-effect (a partial write, a charge, an email) before it was rejected, an idempotency key lets the upstream collapse the retry into the same operation instead of duplicating it.
+>
+> **Upcoming default change:** retrying non-idempotent `POST`/`PATCH` by default is risky, so **`allowUnsafeRetry` will default to `false` in the next major version** - healed retries of those methods will become opt-in. Until then, if you leave it unset you'll see a one-time deprecation warning the first time a non-idempotent request is healed. Pin your intent now to avoid surprises: set `allowUnsafeRetry: true` to keep healing `POST`/`PATCH` (and send an `Idempotency-Key`), or `allowUnsafeRetry: false` to adopt the safer behavior today.
 
 ## Persistent Rule Store
 

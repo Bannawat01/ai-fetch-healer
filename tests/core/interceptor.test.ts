@@ -973,4 +973,127 @@ describe("createHealedFetch", () => {
 			expect(result.status).toBe(400);
 		});
 	});
+
+	describe("allowUnsafeRetry default-change deprecation warning", () => {
+		const rule = { action: "MAP_FIELDS", mapping: { name: "full_name" } };
+
+		function makeProvider(): ILLMProvider {
+			return {
+				name: "MockProvider",
+				heal: vi.fn().mockResolvedValue({ healedPayload: {}, rule }),
+			};
+		}
+
+		const bad = () =>
+			new Response("invalid payload", {
+				status: 400,
+				statusText: "Bad Request",
+				headers: { "content-type": "text/plain" },
+			});
+		const good = () =>
+			new Response('{"ok":true}', {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			});
+
+		function depWarnings(logger: {
+			warn: ReturnType<typeof vi.fn>;
+		}): unknown[] {
+			return logger.warn.mock.calls.filter((c) =>
+				String(c[0]).includes("Deprecation"),
+			);
+		}
+
+		it("warns once (not per request) when riding the default on a non-idempotent method", async () => {
+			const fetchMock = vi
+				.fn()
+				.mockResolvedValueOnce(bad())
+				.mockResolvedValueOnce(good())
+				.mockResolvedValueOnce(bad())
+				.mockResolvedValueOnce(good());
+			const logger = { log: vi.fn(), warn: vi.fn() };
+
+			const healedFetch = createHealedFetch(makeProvider(), {
+				fetchFunction: fetchMock as unknown as typeof fetch,
+				cache: new HeuristicCache(),
+				logger,
+				// allowUnsafeRetry intentionally omitted - riding the default.
+			});
+
+			await healedFetch("https://api.example.com/users", {
+				method: "POST",
+				body: JSON.stringify({ name: "Alice" }),
+			});
+			await healedFetch("https://api.example.com/users", {
+				method: "POST",
+				body: JSON.stringify({ name: "Alice" }),
+			});
+
+			const warnings = depWarnings(logger);
+			expect(warnings).toHaveLength(1);
+			expect(String(warnings[0])).toMatch(/default to false/);
+		});
+
+		it("does NOT warn when allowUnsafeRetry is set explicitly to true", async () => {
+			const fetchMock = vi
+				.fn()
+				.mockResolvedValueOnce(bad())
+				.mockResolvedValueOnce(good());
+			const logger = { log: vi.fn(), warn: vi.fn() };
+
+			const healedFetch = createHealedFetch(makeProvider(), {
+				fetchFunction: fetchMock as unknown as typeof fetch,
+				cache: new HeuristicCache(),
+				logger,
+				allowUnsafeRetry: true,
+			});
+
+			await healedFetch("https://api.example.com/users", {
+				method: "POST",
+				body: JSON.stringify({ name: "Alice" }),
+			});
+
+			expect(depWarnings(logger)).toHaveLength(0);
+		});
+
+		it("does NOT warn when allowUnsafeRetry is false (retry is skipped anyway)", async () => {
+			const fetchMock = vi.fn().mockResolvedValueOnce(bad());
+			const logger = { log: vi.fn(), warn: vi.fn() };
+
+			const healedFetch = createHealedFetch(makeProvider(), {
+				fetchFunction: fetchMock as unknown as typeof fetch,
+				cache: new HeuristicCache(),
+				logger,
+				allowUnsafeRetry: false,
+			});
+
+			await healedFetch("https://api.example.com/users", {
+				method: "POST",
+				body: JSON.stringify({ name: "Alice" }),
+			});
+
+			expect(depWarnings(logger)).toHaveLength(0);
+		});
+
+		it("does NOT warn for idempotent methods even on the default", async () => {
+			const fetchMock = vi
+				.fn()
+				.mockResolvedValueOnce(bad())
+				.mockResolvedValueOnce(good());
+			const logger = { log: vi.fn(), warn: vi.fn() };
+
+			const healedFetch = createHealedFetch(makeProvider(), {
+				fetchFunction: fetchMock as unknown as typeof fetch,
+				cache: new HeuristicCache(),
+				logger,
+			});
+
+			await healedFetch("https://api.example.com/users", {
+				method: "PUT",
+				body: JSON.stringify({ name: "Alice" }),
+			});
+
+			expect(depWarnings(logger)).toHaveLength(0);
+		});
+	});
 });
