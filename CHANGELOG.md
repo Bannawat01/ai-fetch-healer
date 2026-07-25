@@ -1,3 +1,15 @@
+# [1.13.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.12.0...v1.13.0) (2026-07-25)
+
+
+### Bug Fixes
+
+* persist healing rule only after a 2xx healed retry ([21c7692](https://github.com/Bannawat01/ai-fetch-healer/commit/21c76925273dd60e9bb5f9bfcd6219d0375dcc04))
+
+
+### Features
+
+* deprecation warning for upcoming allowUnsafeRetry default change ([7153a8c](https://github.com/Bannawat01/ai-fetch-healer/commit/7153a8c21f7bd5461e8b1c1d317747d1086ce1ba))
+
 # [1.12.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.11.0...v1.12.0) (2026-07-25)
 
 
