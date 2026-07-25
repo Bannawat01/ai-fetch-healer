@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.11.0...v1.12.0) (2026-07-25)
+
+
+### Features
+
+* `ai-fetch-healer init` scaffolder + README Scope & Cost ([5058f75](https://github.com/Bannawat01/ai-fetch-healer/commit/5058f750bb59fd63a57099e05fac99be64eed81a))
+
 # [1.11.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.10.0...v1.11.0) (2026-07-24)
 
 
