@@ -309,6 +309,10 @@ export function createHealedFetch(
 			const cacheKey = generateRuleKey(method, urlStr, maskedSchema);
 
 			let healingRule: HealingRule | null = null;
+			// Only a fresh LLM rule is a persist candidate, and only after its
+			// healed retry actually succeeds (see the retry below). A rule read
+			// from the store is already persisted; a dry-run never retries.
+			let ruleFromLLM = false;
 			try {
 				healingRule = (await store.get(cacheKey)) ?? null;
 			} catch (storeError) {
@@ -348,14 +352,10 @@ export function createHealedFetch(
 					return ensureReadableResponse(response);
 				}
 
-				try {
-					await store.set(cacheKey, healingRule);
-				} catch (storeError) {
-					logger.warn(
-						"[ai-fetch-healer] Rule store set() failed, rule not persisted.",
-						storeError,
-					);
-				}
+				// Do NOT persist here: a rule the LLM guessed wrong would still
+				// be cached and reused. It is written only after the healed retry
+				// returns 2xx (below), so a wrong rule can't poison later requests.
+				ruleFromLLM = true;
 				onHeal?.({
 					rule: healingRule,
 					source: "llm",
@@ -432,7 +432,24 @@ export function createHealedFetch(
 				body: JSON.stringify(finalPayload),
 			};
 
-			return await baseFetch(input, healedInit);
+			const healedResponse = await baseFetch(input, healedInit);
+
+			// Persist the rule only now, and only if it actually worked (2xx).
+			// A rule whose healed retry still fails (wrong guess, or upstream
+			// down) is never cached, so a single miss can't become a repeated
+			// one. Cache-hit rules are already stored; don't rewrite them.
+			if (ruleFromLLM && healedResponse.ok) {
+				try {
+					await store.set(cacheKey, healingRule);
+				} catch (storeError) {
+					logger.warn(
+						"[ai-fetch-healer] Rule store set() failed, rule not persisted.",
+						storeError,
+					);
+				}
+			}
+
+			return healedResponse;
 		} catch (error) {
 			logger.warn(
 				"[ai-fetch-healer] Auto-healing failed, returning original response.",

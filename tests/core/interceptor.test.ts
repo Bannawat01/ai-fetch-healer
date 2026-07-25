@@ -381,14 +381,26 @@ describe("createHealedFetch", () => {
 		});
 		const provider: ILLMProvider = { name: "MockProvider", heal };
 
-		const fetchMock = vi.fn();
-		fetchMock.mockResolvedValue(
+		// Each healedFetch does: original send (400) then a healed retry. The
+		// retry must return 2xx for the rule to be cached (persist-on-success),
+		// so the second call can hit the cache instead of re-consulting the LLM.
+		const bad = () =>
 			new Response("invalid payload", {
 				status: 400,
 				statusText: "Bad Request",
 				headers: { "content-type": "text/plain" },
-			}),
-		);
+			});
+		const good = () =>
+			new Response('{"ok":true}', {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			});
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(bad())
+			.mockResolvedValueOnce(good())
+			.mockResolvedValueOnce(bad())
+			.mockResolvedValueOnce(good());
 
 		const cache = new HeuristicCache();
 		const onHeal = vi.fn();
@@ -620,13 +632,25 @@ describe("createHealedFetch", () => {
 			},
 		};
 
-		const fetchMock = vi.fn().mockResolvedValue(
+		// Retry must succeed (2xx) for the rule to be persisted, so the second
+		// request finds it in the store instead of consulting the LLM again.
+		const bad = () =>
 			new Response("invalid payload", {
 				status: 400,
 				statusText: "Bad Request",
 				headers: { "content-type": "text/plain" },
-			}),
-		);
+			});
+		const good = () =>
+			new Response('{"ok":true}', {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			});
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(bad())
+			.mockResolvedValueOnce(good())
+			.mockResolvedValueOnce(bad())
+			.mockResolvedValueOnce(good());
 
 		const healedFetch = createHealedFetch(provider, {
 			fetchFunction: fetchMock as unknown as typeof fetch,
@@ -833,5 +857,120 @@ describe("createHealedFetch", () => {
 		expect(storeGet).toHaveBeenCalledTimes(1);
 		expect(cacheGet).not.toHaveBeenCalled();
 		expect(heal).not.toHaveBeenCalled();
+	});
+
+	describe("persists a rule only when the healed retry succeeds", () => {
+		const rule = { action: "MAP_FIELDS", mapping: { name: "full_name" } };
+
+		function makeProvider(): ILLMProvider {
+			return {
+				name: "MockProvider",
+				heal: vi.fn().mockResolvedValue({ healedPayload: {}, rule }),
+			};
+		}
+
+		it("persists the rule when the healed retry returns 2xx", async () => {
+			const fetchMock = vi.fn();
+			fetchMock.mockResolvedValueOnce(
+				new Response("invalid payload", {
+					status: 400,
+					statusText: "Bad Request",
+					headers: { "content-type": "text/plain" },
+				}),
+			);
+			fetchMock.mockResolvedValueOnce(
+				new Response('{"ok":true}', {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
+			);
+
+			const store: RuleStore = {
+				get: vi.fn().mockResolvedValue(null),
+				set: vi.fn(),
+			};
+
+			const healedFetch = createHealedFetch(makeProvider(), {
+				fetchFunction: fetchMock as unknown as typeof fetch,
+				store,
+			});
+
+			await healedFetch("https://api.example.com/users", {
+				method: "POST",
+				body: JSON.stringify({ name: "Alice" }),
+			});
+
+			expect(fetchMock).toHaveBeenCalledTimes(2);
+			expect(store.set).toHaveBeenCalledTimes(1);
+			expect(store.set).toHaveBeenCalledWith(expect.any(String), rule);
+		});
+
+		it("does NOT persist the rule when the healed retry still fails (non-2xx)", async () => {
+			// Both the original send and the healed retry return 400: the LLM's
+			// rule was wrong, so it must not be cached and reused later.
+			const fetchMock = vi.fn().mockResolvedValue(
+				new Response("still bad", {
+					status: 400,
+					statusText: "Bad Request",
+					headers: { "content-type": "text/plain" },
+				}),
+			);
+
+			const store: RuleStore = {
+				get: vi.fn().mockResolvedValue(null),
+				set: vi.fn(),
+			};
+
+			const healedFetch = createHealedFetch(makeProvider(), {
+				fetchFunction: fetchMock as unknown as typeof fetch,
+				store,
+			});
+
+			const result = await healedFetch("https://api.example.com/users", {
+				method: "POST",
+				body: JSON.stringify({ name: "Alice" }),
+			});
+
+			expect(fetchMock).toHaveBeenCalledTimes(2); // original + one healed retry
+			expect(store.set).not.toHaveBeenCalled();
+			expect(result.status).toBe(400); // fail-open: caller still gets a response
+		});
+
+		it("dryRun: reports via onHeal, sends no retry, and persists nothing", async () => {
+			const fetchMock = vi.fn().mockResolvedValueOnce(
+				new Response("invalid payload", {
+					status: 400,
+					statusText: "Bad Request",
+					headers: { "content-type": "text/plain" },
+				}),
+			);
+
+			const store: RuleStore = {
+				get: vi.fn().mockResolvedValue(null),
+				set: vi.fn(),
+			};
+			const onHeal = vi.fn();
+
+			const healedFetch = createHealedFetch(makeProvider(), {
+				fetchFunction: fetchMock as unknown as typeof fetch,
+				store,
+				dryRun: true,
+				onHeal,
+			});
+
+			const result = await healedFetch("https://api.example.com/users", {
+				method: "POST",
+				body: JSON.stringify({ name: "Alice" }),
+			});
+
+			expect(onHeal).toHaveBeenCalledWith({
+				rule,
+				source: "llm",
+				dryRun: true,
+			});
+			expect(fetchMock).toHaveBeenCalledTimes(1); // no healed retry
+			expect(store.set).not.toHaveBeenCalled();
+			expect(result.status).toBe(400);
+		});
 	});
 });
