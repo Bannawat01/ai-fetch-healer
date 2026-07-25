@@ -1,8 +1,15 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cliPath = resolve(here, "../dist/cli.js");
@@ -17,10 +24,12 @@ const maybe = existsSync(cliPath) ? describe : describe.skip;
 function runCli(
 	args: string[],
 	env: Record<string, string>,
+	cwd?: string,
 ): { status: number | null; stdout: string } {
 	const result = spawnSync(process.execPath, [cliPath, ...args], {
 		// Clean env: only what we pass, so the developer's real keys never leak in.
 		env: { PATH: process.env.PATH ?? "", ...env },
+		cwd,
 		encoding: "utf8",
 	});
 	// Strip ANSI color codes for stable assertions.
@@ -61,5 +70,64 @@ maybe("ai-fetch-healer CLI", () => {
 
 		expect(stdout).toContain("ai-fetch-healer <command>");
 		expect(stdout).toContain("doctor");
+		expect(stdout).toContain("init");
+	});
+
+	describe("init", () => {
+		let dir: string;
+
+		beforeEach(() => {
+			dir = mkdtempSync(join(tmpdir(), "ai-fetch-healer-init-"));
+		});
+
+		afterEach(() => {
+			rmSync(dir, { recursive: true, force: true });
+		});
+
+		it("writes the provider env var to .env in the cwd", () => {
+			const { status, stdout } = runCli(
+				["init", "--provider", "openrouter"],
+				{},
+				dir,
+			);
+
+			expect(status).toBe(0);
+			expect(stdout).toContain("Wrote AI_HEALER_OPENROUTER_KEY to .env");
+			const env = readFileSync(join(dir, ".env"), "utf8");
+			expect(env).toContain("AI_HEALER_OPENROUTER_KEY=");
+		});
+
+		it("writes a concrete default for ollama (no key needed)", () => {
+			runCli(["init", "--provider", "ollama"], {}, dir);
+
+			const env = readFileSync(join(dir, ".env"), "utf8");
+			expect(env).toContain("AI_HEALER_OLLAMA_URL=http://localhost:11434");
+		});
+
+		it("leaves an existing env var untouched without --force", () => {
+			writeFileSync(
+				join(dir, ".env"),
+				"AI_HEALER_OPENAI_KEY=sk-mine\n",
+				"utf8",
+			);
+
+			const { stdout } = runCli(["init", "--provider", "openai"], {}, dir);
+
+			expect(stdout).toContain("already set in .env");
+			const env = readFileSync(join(dir, ".env"), "utf8");
+			expect(env).toContain("AI_HEALER_OPENAI_KEY=sk-mine");
+		});
+
+		it("rejects an unknown provider and lists the valid ones", () => {
+			const { status, stdout } = runCli(
+				["init", "--provider", "nope"],
+				{},
+				dir,
+			);
+
+			expect(status).toBe(1);
+			expect(stdout).toContain("Available:");
+			expect(existsSync(join(dir, ".env"))).toBe(false);
+		});
 	});
 });

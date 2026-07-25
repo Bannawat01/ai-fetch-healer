@@ -36,7 +36,8 @@ await healedFetch('https://api.example.com/users', {
 - [Why It Matters](#why-it-matters)
 - [How It Works](#how-it-works)
 - [Quick Start](#quick-start)
-- [CLI: `doctor`](#cli-doctor)
+- [Scope & Cost](#scope--cost)
+- [CLI](#cli)
 - [Zero-Config Global Install](#zero-config-global-install)
 - [Supported Providers](#supported-providers)
 - [Framework Adapters](#framework-adapters)
@@ -126,7 +127,55 @@ const healedFetch = createHealedFetch(new OpenRouterProvider());
 
 Create `healedFetch` **once** per provider (module scope, not per-request) - a fresh instance every call defeats the built-in rule cache and forces an LLM round-trip on every single request. Building an Express or Next.js route around it? See [Framework Adapters](#framework-adapters) below.
 
-## CLI: `doctor`
+## Scope & Cost
+
+Knowing exactly what this does - and what it costs - up front saves surprises later.
+
+**What it heals**
+
+- Responses whose status is in `healableStatuses` (default `[400, 422]`; configurable).
+- Requests whose body is a JSON **object** sent as a string (`JSON.stringify({...})`).
+- Schema-shaped problems: renamed or wrong-cased fields, wrong scalar types, a missing required field.
+
+**What it does _not_ touch** (the original response passes straight through, untouched):
+
+- Auth/permission errors (`401`/`403`), rate limits (`429`), server errors (`5xx`) - not schema problems, so there's nothing to heal.
+- Non-JSON bodies (`FormData`, `URLSearchParams`, streams, plain strings) and `GET`/`HEAD` requests with no body.
+- Anything semantic: a valid-shaped payload the API rejects for business reasons.
+
+**What it costs**
+
+- **Money & latency happen only on a cache miss** - the first time a given request shape fails. That one request pays an extra LLM round-trip (typically ~0.5-3s and a fraction of a cent, depending on your provider/model). The fix is then cached, so every later request of that shape is healed locally with **zero** extra calls.
+- Persist the cache across restarts with a [rule store](#persistent-rule-store) so you don't re-pay after every deploy.
+- Want a chunk of healing for **free**? [`HeuristicHealer`](#no-llm-healing-free-instant) fixes the most common case (field casing) with no LLM, no key, and no latency at all.
+
+`ai-fetch-healer` is **fail-open by design**: if anything in the healing path fails - masking, the provider call, an invalid rule - it returns the original response and never throws into your code. Adding it can't make a request fail that would otherwise have succeeded.
+
+## CLI
+
+### `init` - scaffold a provider in one command
+
+New to the library? Let the CLI write your `.env` line and print the snippet to paste:
+
+```bash
+npx ai-fetch-healer init --provider openrouter
+```
+
+```
+ai-fetch-healer init
+  ✓ Wrote AI_HEALER_OPENROUTER_KEY to .env
+  Now paste your OpenRouter key after the "=" (get one at https://openrouter.ai/keys).
+
+Add this to your code:
+  import { createHealedFetchFromEnv } from "ai-fetch-healer";
+  const healedFetch = createHealedFetchFromEnv();
+
+Next: npx ai-fetch-healer doctor to verify the setup.
+```
+
+Providers: `openrouter`, `openai`, `anthropic`, `groq`, `gemini`, `ollama` (the last writes a concrete local URL, no key needed). It never overwrites a variable already in your `.env` unless you pass `--force`.
+
+### `doctor` - preflight your setup
 
 Before wiring healing into your app, confirm your environment is actually set up right:
 
