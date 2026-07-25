@@ -367,6 +367,8 @@ const healedFetch = createHealedFetch(provider, {
 });
 ```
 
+> **Idempotency:** when `allowUnsafeRetry` is `true` (the default) and the upstream API supports it, send an `Idempotency-Key` header on `POST`/`PATCH` requests. A healed retry re-sends the request, so if the original had already applied a side-effect (a partial write, a charge, an email) before it was rejected, an idempotency key lets the upstream collapse the retry into the same operation instead of duplicating it.
+
 ## Persistent Rule Store
 
 By default, healed rules live in an in-memory LRU cache - a restart or redeploy forgets everything and the next failing request pays the LLM round-trip again. Plug in a `RuleStore` to persist rules across restarts:
@@ -441,7 +443,7 @@ Watch the logs for a while; once the proposed rules look right, drop `dryRun` an
 
 ## Security & Privacy (The Masker)
 
-`ai-fetch-healer` follows privacy-by-design: before any healing analysis, payloads are recursively masked so only schema-safe signals - types and masked strings, never real values - are ever sent to an LLM provider.
+`ai-fetch-healer` masks payloads before any healing analysis: every value is recursively reduced to its type name (or a category label for sensitive keys), so no real value is ever sent to an LLM provider. See [What the masker does and does not send](#what-the-masker-does-and-does-not-send) for the exact boundary.
 
 ### Sensitive key defaults
 
@@ -453,9 +455,11 @@ Watch the logs for a while; once the proposed rules look right, drop `dryRun` an
 
 Key matching is case-insensitive and separator-agnostic (`User-Email`, `USER_PASSWORD`, etc. are all caught).
 
-### Compliance
+### What the masker does and does not send
 
-PDPA & GDPR friendly by construction: no PII is ever transmitted to LLM providers, because the payload never leaves masking with real values still attached.
+Every value in the payload is reduced to its type name (`"string"`, `"number"`, ...) before anything is sent to an LLM - a value that matches a sensitive key becomes a category label like `masked_email` instead, and either way no raw value leaves the masker.
+
+The one thing that *is* sent is the set of object **keys**, unchanged, as the schema shape the healer reasons about (that is how it can propose a field rename). So a key whose name itself contains personal data - which is rare, but possible - would be transmitted to the provider. If your payloads can carry PII inside key names, mask or rename those keys before they reach `healedFetch`.
 
 ### Custom masker for enterprise fields
 
