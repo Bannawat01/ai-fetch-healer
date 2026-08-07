@@ -1,3 +1,11 @@
+# [1.14.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.13.0...v1.14.0) (2026-08-07)
+
+
+### Features
+
+* approveRule policy gate for per-rule healing approval ([9e2cbb4](https://github.com/Bannawat01/ai-fetch-healer/commit/9e2cbb46602bc566748f78c5df4126b09e2fe891))
+* HealStats observability collector + method/url on HealEvent ([0826c96](https://github.com/Bannawat01/ai-fetch-healer/commit/0826c9645edca417d26ec0968038ad732c89ae54))
+
 # [1.13.0](https://github.com/Bannawat01/ai-fetch-healer/compare/v1.12.0...v1.13.0) (2026-07-25)
 
 
