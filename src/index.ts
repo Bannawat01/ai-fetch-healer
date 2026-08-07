@@ -18,7 +18,12 @@ export type {
 export { installGlobalHealing } from "./core/install-global";
 export type { HealStatsSnapshot } from "./core/heal-stats";
 export { HealStats } from "./core/heal-stats";
-export type { HealEvent, HealerConfig, Logger } from "./core/interceptor";
+export type {
+	HealEvent,
+	HealerConfig,
+	Logger,
+	RuleContext,
+} from "./core/interceptor";
 export { createHealedFetch } from "./core/interceptor";
 export type { RuleStore } from "./core/store";
 export { generateRuleKey } from "./core/store";

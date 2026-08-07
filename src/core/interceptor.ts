@@ -28,6 +28,16 @@ export interface HealEvent {
 	url?: string;
 }
 
+/** Context passed to `approveRule` so a policy can decide per request. */
+export interface RuleContext {
+	/** HTTP method of the request being healed (uppercased). */
+	method: string;
+	/** URL of the request being healed. */
+	url: string;
+	/** Where the rule came from - a fresh LLM guess vs. a previously cached rule. */
+	source: "llm" | "cache";
+}
+
 export interface HealerConfig {
 	fetchFunction?: typeof fetch;
 	cache?: HeuristicCache;
@@ -65,6 +75,19 @@ export interface HealerConfig {
 	onHeal?: (event: HealEvent) => void;
 	/** Called when provider.heal() exhausts retries, or the rule it returns fails validation. */
 	onHealFail?: (error: unknown) => void;
+	/**
+	 * Per-rule approval gate, checked after a valid rule is obtained but before
+	 * it is applied and retried. Return false (or a rejecting promise's false)
+	 * to decline this specific rule - the original response is returned
+	 * untouched, same as any other fail-open path. Unlike `dryRun` (which blocks
+	 * every retry), this lets you allow safe rules through while vetoing risky
+	 * ones - e.g. reject `ADD_REQUIRED` in production, or require human sign-off
+	 * for a given endpoint. Not called in dry-run mode (nothing is applied there).
+	 */
+	approveRule?: (
+		rule: HealingRule,
+		context: RuleContext,
+	) => boolean | Promise<boolean>;
 }
 
 const DEFAULT_HEALABLE_STATUSES = [400, 422];
@@ -242,6 +265,7 @@ export function createHealedFetch(
 	const logger = config.logger ?? console;
 	const onHeal = config.onHeal;
 	const onHealFail = config.onHealFail;
+	const approveRule = config.approveRule;
 
 	return async function healedFetch(
 		input: RequestInfo | URL,
@@ -421,6 +445,23 @@ export function createHealedFetch(
 				logger.warn(
 					`[ai-fetch-healer] Unsupported action "${healingRule.action}". Applying mapping fallback.`,
 				);
+			}
+
+			// Per-rule policy gate: let the caller veto a specific rule before it
+			// is applied (e.g. reject a risky ADD_REQUIRED guess). Declining is a
+			// normal fail-open, not a failure - return the original untouched.
+			if (approveRule) {
+				const approved = await approveRule(healingRule, {
+					method,
+					url: urlStr,
+					source: ruleFromLLM ? "llm" : "cache",
+				});
+				if (!approved) {
+					logger.warn(
+						`[ai-fetch-healer] Healing rule declined by approveRule for ${method} ${urlStr}. Returning original response.`,
+					);
+					return ensureReadableResponse(response);
+				}
 			}
 
 			const finalPayload: JsonPayload = { ...originalPayload };

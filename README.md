@@ -472,6 +472,27 @@ const healedFetch = createHealedFetch(new OpenRouterProvider(), {
 
 Watch the logs for a while; once the proposed rules look right, drop `dryRun` and healing goes live.
 
+### Approving rules - allow the safe, veto the risky
+
+`dryRun` is all-or-nothing: it blocks *every* retry. When you want healing live but not unconditional, `approveRule` gates each rule individually. It runs after a rule is validated but before it's applied; return `false` (sync or async) to decline that one rule, and the caller gets the original response untouched - the same fail-open as any other declined heal.
+
+```ts
+const healedFetch = createHealedFetch(new OpenRouterProvider(), {
+  approveRule: (rule, ctx) => {
+    // A rename is safe; injecting a guessed value is not - never let the LLM
+    // invent a field value in production.
+    if (rule.action === 'ADD_REQUIRED') return false;
+    // Require a fresh LLM guess to be reviewed on a sensitive route; trust cache.
+    if (ctx.method === 'POST' && ctx.url.includes('/payments') && ctx.source === 'llm') {
+      return false;
+    }
+    return true;
+  },
+});
+```
+
+The callback gets the `rule` and a `ctx` of `{ method, url, source }` (`source` is `"llm"` for a fresh guess or `"cache"` for a replay). It can be async - return a promise if the decision needs a lookup or a human approval queue. Not called in `dryRun` mode, since nothing is applied there anyway.
+
 ## Security & Privacy (The Masker)
 
 `ai-fetch-healer` masks payloads before any healing analysis: every value is recursively reduced to its type name (or a category label for sensitive keys), so no real value is ever sent to an LLM provider. See [What the masker does and does not send](#what-the-masker-does-and-does-not-send) for the exact boundary.

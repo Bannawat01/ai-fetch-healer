@@ -1113,4 +1113,170 @@ describe("createHealedFetch", () => {
 			expect(depWarnings(logger)).toHaveLength(0);
 		});
 	});
+
+	describe("approveRule policy gate", () => {
+		const rule = { action: "MAP_FIELDS", mapping: { name: "full_name" } };
+
+		function makeProvider(): ILLMProvider {
+			return {
+				name: "MockProvider",
+				heal: vi.fn().mockResolvedValue({ healedPayload: {}, rule }),
+			};
+		}
+
+		function failThenSucceed() {
+			const fetchMock = vi.fn();
+			fetchMock.mockResolvedValueOnce(
+				new Response("invalid payload", {
+					status: 400,
+					statusText: "Bad Request",
+					headers: { "content-type": "text/plain" },
+				}),
+			);
+			fetchMock.mockResolvedValueOnce(
+				new Response('{"ok":true}', {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
+			);
+			return fetchMock;
+		}
+
+		it("applies and retries when approveRule returns true", async () => {
+			const fetchMock = failThenSucceed();
+			const approveRule = vi.fn().mockReturnValue(true);
+
+			const healedFetch = createHealedFetch(makeProvider(), {
+				fetchFunction: fetchMock as unknown as typeof fetch,
+				cache: new HeuristicCache(),
+				approveRule,
+			});
+
+			await healedFetch("https://api.example.com/users", {
+				method: "POST",
+				body: JSON.stringify({ name: "Alice" }),
+			});
+
+			expect(approveRule).toHaveBeenCalledTimes(1);
+			expect(fetchMock).toHaveBeenCalledTimes(2);
+			const healedBody = JSON.parse(
+				String((fetchMock.mock.calls[1][1] as RequestInit).body),
+			);
+			expect(healedBody).toEqual({ full_name: "Alice" });
+		});
+
+		it("declines the rule (fail-open) when approveRule returns false", async () => {
+			const fetchMock = failThenSucceed();
+			const approveRule = vi.fn().mockReturnValue(false);
+
+			const healedFetch = createHealedFetch(makeProvider(), {
+				fetchFunction: fetchMock as unknown as typeof fetch,
+				cache: new HeuristicCache(),
+				approveRule,
+			});
+
+			const result = await healedFetch("https://api.example.com/users", {
+				method: "POST",
+				body: JSON.stringify({ name: "Alice" }),
+			});
+
+			expect(approveRule).toHaveBeenCalledTimes(1);
+			expect(fetchMock).toHaveBeenCalledTimes(1); // no healed retry
+			expect(result.status).toBe(400); // original response, untouched
+		});
+
+		it("supports an async approveRule that rejects the rule", async () => {
+			const fetchMock = failThenSucceed();
+			const approveRule = vi.fn().mockResolvedValue(false);
+
+			const healedFetch = createHealedFetch(makeProvider(), {
+				fetchFunction: fetchMock as unknown as typeof fetch,
+				cache: new HeuristicCache(),
+				approveRule,
+			});
+
+			const result = await healedFetch("https://api.example.com/users", {
+				method: "POST",
+				body: JSON.stringify({ name: "Alice" }),
+			});
+
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+			expect(result.status).toBe(400);
+		});
+
+		it("receives the rule and a context with method, url, and source", async () => {
+			const fetchMock = failThenSucceed();
+			const approveRule = vi.fn().mockReturnValue(true);
+
+			const healedFetch = createHealedFetch(makeProvider(), {
+				fetchFunction: fetchMock as unknown as typeof fetch,
+				cache: new HeuristicCache(),
+				approveRule,
+			});
+
+			await healedFetch("https://api.example.com/v1/orders?trace=1", {
+				method: "POST",
+				body: JSON.stringify({ name: "Alice" }),
+			});
+
+			expect(approveRule).toHaveBeenCalledWith(rule, {
+				method: "POST",
+				url: "https://api.example.com/v1/orders?trace=1",
+				source: "llm",
+			});
+		});
+
+		it("lets a policy allow MAP_FIELDS but veto ADD_REQUIRED", async () => {
+			const provider: ILLMProvider = {
+				name: "MockProvider",
+				heal: vi.fn().mockResolvedValue({
+					healedPayload: {},
+					rule: { action: "ADD_REQUIRED", addFields: { currency: "USD" } },
+				}),
+			};
+			const fetchMock = failThenSucceed();
+			// Reject anything that injects fields; allow pure renames.
+			const approveRule = (r: HealingRule) => r.action !== "ADD_REQUIRED";
+
+			const healedFetch = createHealedFetch(provider, {
+				fetchFunction: fetchMock as unknown as typeof fetch,
+				cache: new HeuristicCache(),
+				approveRule,
+			});
+
+			const result = await healedFetch("https://api.example.com/orders", {
+				method: "POST",
+				body: JSON.stringify({ amount: 100 }),
+			});
+
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+			expect(result.status).toBe(400);
+		});
+
+		it("is not called in dry-run mode (nothing is applied there)", async () => {
+			const fetchMock = vi.fn().mockResolvedValueOnce(
+				new Response("invalid payload", {
+					status: 400,
+					statusText: "Bad Request",
+					headers: { "content-type": "text/plain" },
+				}),
+			);
+			const approveRule = vi.fn().mockReturnValue(true);
+
+			const healedFetch = createHealedFetch(makeProvider(), {
+				fetchFunction: fetchMock as unknown as typeof fetch,
+				cache: new HeuristicCache(),
+				dryRun: true,
+				approveRule,
+			});
+
+			await healedFetch("https://api.example.com/users", {
+				method: "POST",
+				body: JSON.stringify({ name: "Alice" }),
+			});
+
+			expect(approveRule).not.toHaveBeenCalled();
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+		});
+	});
 });
