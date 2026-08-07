@@ -1,0 +1,5 @@
+# Normalize all text files to LF in the repo and on checkout, so a Windows
+# working tree matches CI (Linux/LF). Without this, autocrlf produces CRLF
+# locally, which makes `biome check .` report format noise that both hides
+# real issues and diverges the local gate from the CI one.
+* text=auto eol=lf
