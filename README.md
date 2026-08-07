@@ -424,7 +424,36 @@ const healedFetch = createHealedFetch(new OpenRouterProvider(), {
 });
 ```
 
+The `HealEvent` also carries the `method` and `url` of the request being healed, so you can attribute heals to the exact endpoint.
+
 See [`examples/observability.ts`](./examples/observability.ts) for a full example.
+
+### Heal stats - spotting contract drift
+
+Healing is a safety net, not a place to hide a broken contract. If one endpoint heals thousands of times, the upstream schema has drifted and the code should be fixed to match - not left leaning on the healer forever. `HealStats` aggregates heal activity in-process so that signal is visible instead of buried:
+
+```ts
+import { createHealedFetch, HealStats, OpenRouterProvider } from 'ai-fetch-healer';
+
+const stats = new HealStats();
+const healedFetch = createHealedFetch(new OpenRouterProvider(), {
+  onHeal: stats.onHeal,       // bound methods - hand them off directly
+  onHealFail: stats.onHealFail,
+});
+
+// Log or scrape on an interval:
+setInterval(() => {
+  console.log(stats.snapshot());
+  // {
+  //   total: 812, llm: 3, cache: 809, dryRun: 0, failures: 1,
+  //   byEndpoint: { 'POST /v1/orders': 800, 'PATCH /v1/users': 12 },
+  //   byAction:   { ADD_REQUIRED: 800, MAP_FIELDS: 12 },
+  // }
+  stats.reset(); // optional: zero the window after exporting
+}, 60_000);
+```
+
+`snapshot()` returns plain numbers (a copy - mutating it won't touch the collector), so it maps cleanly onto any metrics backend: `total`/`failures` to counters, `byEndpoint`/`byAction` to labelled counters. No OpenTelemetry (or any) dependency required. The per-endpoint counts are the ones to alert on: a route climbing into the thousands is a to-do to update your code, and the `cache`-vs-`llm` split shows how much you're actually paying the provider versus replaying cached rules.
 
 ### Dry-run / audit mode
 

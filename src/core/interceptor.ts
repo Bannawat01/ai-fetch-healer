@@ -22,6 +22,10 @@ export interface HealEvent {
 	 * reported but the healed retry was deliberately not sent. Absent otherwise.
 	 */
 	dryRun?: true;
+	/** HTTP method of the request being healed (uppercased), for attribution. */
+	method?: string;
+	/** URL of the request being healed, for attribution/grouping. */
+	url?: string;
 }
 
 export interface HealerConfig {
@@ -377,6 +381,8 @@ export function createHealedFetch(
 				onHeal?.({
 					rule: healingRule,
 					source: "llm",
+					method,
+					url: urlStr,
 					...(dryRun ? { dryRun: true } : {}),
 				});
 			} else {
@@ -386,6 +392,8 @@ export function createHealedFetch(
 				onHeal?.({
 					rule: healingRule,
 					source: "cache",
+					method,
+					url: urlStr,
 					...(dryRun ? { dryRun: true } : {}),
 				});
 			}

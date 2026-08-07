@@ -366,10 +366,12 @@ describe("createHealedFetch", () => {
 		expect(logger.log).toHaveBeenCalled();
 		expect(logger.warn).toHaveBeenCalled();
 		expect(consoleLogSpy).not.toHaveBeenCalled();
-		expect(onHeal).toHaveBeenCalledWith({
-			rule: { action: "MAP_FIELDS", mapping: { name: "full_name" } },
-			source: "llm",
-		});
+		expect(onHeal).toHaveBeenCalledWith(
+			expect.objectContaining({
+				rule: { action: "MAP_FIELDS", mapping: { name: "full_name" } },
+				source: "llm",
+			}),
+		);
 
 		consoleLogSpy.mockRestore();
 	});
@@ -421,14 +423,20 @@ describe("createHealedFetch", () => {
 		});
 
 		expect(heal).toHaveBeenCalledTimes(1);
-		expect(onHeal).toHaveBeenNthCalledWith(1, {
-			rule: { action: "MAP_FIELDS", mapping: { name: "full_name" } },
-			source: "llm",
-		});
-		expect(onHeal).toHaveBeenNthCalledWith(2, {
-			rule: { action: "MAP_FIELDS", mapping: { name: "full_name" } },
-			source: "cache",
-		});
+		expect(onHeal).toHaveBeenNthCalledWith(
+			1,
+			expect.objectContaining({
+				rule: { action: "MAP_FIELDS", mapping: { name: "full_name" } },
+				source: "llm",
+			}),
+		);
+		expect(onHeal).toHaveBeenNthCalledWith(
+			2,
+			expect.objectContaining({
+				rule: { action: "MAP_FIELDS", mapping: { name: "full_name" } },
+				source: "cache",
+			}),
+		);
 	});
 
 	it("calls onHealFail when provider.heal() exhausts all retries", async () => {
@@ -747,7 +755,9 @@ describe("createHealedFetch", () => {
 		expect(heal).toHaveBeenCalledTimes(1);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		expect(result.status).toBe(400);
-		expect(onHeal).toHaveBeenCalledWith({ rule, source: "llm", dryRun: true });
+		expect(onHeal).toHaveBeenCalledWith(
+			expect.objectContaining({ rule, source: "llm", dryRun: true }),
+		);
 	});
 
 	it("omits the dryRun flag from onHeal when dry-run is off", async () => {
@@ -783,7 +793,12 @@ describe("createHealedFetch", () => {
 		});
 
 		expect(fetchMock).toHaveBeenCalledTimes(2);
-		expect(onHeal).toHaveBeenCalledWith({ rule, source: "llm" });
+		expect(onHeal).toHaveBeenCalledWith(
+			expect.objectContaining({ rule, source: "llm" }),
+		);
+		expect(onHeal).not.toHaveBeenCalledWith(
+			expect.objectContaining({ dryRun: true }),
+		);
 	});
 
 	it("heals a casing mismatch end-to-end with HeuristicHealer and no LLM key", async () => {
@@ -963,11 +978,13 @@ describe("createHealedFetch", () => {
 				body: JSON.stringify({ name: "Alice" }),
 			});
 
-			expect(onHeal).toHaveBeenCalledWith({
-				rule,
-				source: "llm",
-				dryRun: true,
-			});
+			expect(onHeal).toHaveBeenCalledWith(
+				expect.objectContaining({
+					rule,
+					source: "llm",
+					dryRun: true,
+				}),
+			);
 			expect(fetchMock).toHaveBeenCalledTimes(1); // no healed retry
 			expect(store.set).not.toHaveBeenCalled();
 			expect(result.status).toBe(400);
