@@ -11,13 +11,13 @@ export {
 	createHealedFetchFromEnv,
 	createProviderFromEnv,
 } from "./core/from-env";
+export type { HealStatsSnapshot } from "./core/heal-stats";
+export { HealStats } from "./core/heal-stats";
 export type {
 	InstallGlobalHealingOptions,
 	UninstallGlobalHealing,
 } from "./core/install-global";
 export { installGlobalHealing } from "./core/install-global";
-export type { HealStatsSnapshot } from "./core/heal-stats";
-export { HealStats } from "./core/heal-stats";
 export type {
 	HealEvent,
 	HealerConfig,
